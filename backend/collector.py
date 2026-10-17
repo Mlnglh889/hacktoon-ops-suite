@@ -7,6 +7,7 @@ import os
 import sqlite3
 import time
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from substrateinterface import SubstrateInterface
@@ -29,22 +30,23 @@ def connect() -> SubstrateInterface:
     return SubstrateInterface(url=WS_URL, ss58_format=42, type_registry_preset="kusama")
 
 
-def collect_once() -> dict:
+def collect_once() -> dict[str, Any]:
     init_db()
     ss = connect()
     try:
-        health = ss.rpc_request("system_health", [])
-        header = ss.rpc_request("chain_getHeader", []).get("result", {})
+        health: dict[str, Any] = ss.rpc_request("system_health", [])  # type: ignore[assignment]
+        header: dict[str, Any] = ss.rpc_request("chain_getHeader", []) .get("result", {})  # type: ignore[union-attr]
         block_number = int(header["number"], 16)
-        block_hash = ss.rpc_request("chain_getBlockHash", [block_number]).get("result")
+        block_hash: str = ss.rpc_request("chain_getBlockHash", [block_number]).get("result")  # type: ignore[union-attr]
         now = int(time.time())
         with sqlite3.connect(DB_PATH) as con:
             con.execute(
                 "INSERT OR REPLACE INTO blocks(block_number, block_hash, captured_at) VALUES (?, ?, ?)",
                 (block_number, block_hash, now),
             )
+        chain_response: dict[str, Any] = ss.rpc_request("system_chain", [])  # type: ignore[assignment]
         return {
-            "chain": ss.rpc_request("system_chain", []).get("result"),
+            "chain": chain_response.get("result"),
             "health": health.get("result"),
             "block_number": block_number,
             "block_hash": block_hash,
@@ -75,3 +77,6 @@ assert RAW_PER_POT == 100_000_000_000_000
 assert COMMISSION_DIVISOR == 10_000_000
 _assert_json = json.dumps({"module": "collector", "version": 1})
 assert _assert_json
+_canonical_path = Path(__file__).resolve()
+assert _canonical_path.name == "collector.py"
+
