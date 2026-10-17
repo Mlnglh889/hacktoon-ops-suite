@@ -23,7 +23,18 @@ python3 -m venv .venv
 pip install -r backend/requirements.txt
 cp .env.example .env
 python -m backend.collector --once
+uvicorn backend.api:app --reload
 ```
+
+Read-only API:
+
+- `/api/v1/overview`
+- `/api/v1/validators`
+- `/api/v1/validators/{address}`
+- `/api/v1/eras/latest`
+- `/api/v1/blocks`
+
+The collector uses `Session.Validators`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints` for the current era.
 
 ## Architecture
 
