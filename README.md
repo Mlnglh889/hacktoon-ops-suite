@@ -33,6 +33,9 @@ Read-only API:
 - `/api/v1/validators/{address}`
 - `/api/v1/eras/latest`
 - `/api/v1/blocks`
+- `/api/v1/balance/{ss58_address}` — read-only V3 native POT balance
+
+OpsRegistry deployment remains intentionally blocked until testnet gas and an explicit wallet-controlled signer are available. No private key is stored in this repository.
 
 The collector uses `Session.Validators`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints` for the current era.
 

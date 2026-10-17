@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from .balance import account_balance
 
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = Path(os.getenv("STAKEHUB_DB", str(ROOT / "data" / "ops-suite.db")))
@@ -67,6 +68,16 @@ def latest_era() -> dict[str, Any]:
 def blocks(limit: int = 100) -> dict[str, Any]:
     limit = max(1, min(limit, 500))
     return {"blocks": db_rows(f"SELECT block_number, block_hash, captured_at FROM blocks ORDER BY block_number DESC LIMIT {limit}")}
+
+
+@app.get("/api/v1/balance/{address}")
+def balance(address: str) -> dict[str, Any]:
+    if not address.startswith("5") or len(address) < 40:
+        raise HTTPException(status_code=400, detail="expected a Portaldot SS58 address")
+    try:
+        return account_balance(address)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"V3 balance query failed: {exc}") from exc
 
 
 __all__ = ["app"]
