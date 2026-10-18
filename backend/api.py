@@ -7,11 +7,20 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from .balance import account_balance
+from .metrics import risk_label
 
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = Path(os.getenv("STAKEHUB_DB", str(ROOT / "data" / "ops-suite.db")))
-app = FastAPI(title="Portaldot Ops Suite API", version="0.1.0")
+NETWORK = "PortaldotV3 Test"
+CHAIN_ID = 420420777
+app = FastAPI(title="Portaldot Ops Suite API", version="0.2.0")
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(ROOT / "dashboard.html")
 
 
 def db_rows(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -22,9 +31,16 @@ def db_rows(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return [dict(row) for row in con.execute(sql, params).fetchall()]
 
 
+def _num(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 @app.get("/api/v1/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "network": "PortaldotV3 Test"}
+def health() -> dict[str, Any]:
+    return {"status": "ok", "network": NETWORK, "chain_id": CHAIN_ID, "database": DB_PATH.exists()}
 
 
 @app.get("/api/v1/overview")
@@ -33,7 +49,8 @@ def overview() -> dict[str, Any]:
     era = db_rows("SELECT era, captured_at FROM era_stake ORDER BY era DESC LIMIT 1")
     validator_count = db_rows("SELECT COUNT(*) AS count FROM validators")
     stake = db_rows("SELECT COALESCE(SUM(CAST(total_pot AS REAL)), 0) AS total_pot FROM era_stake WHERE era = (SELECT MAX(era) FROM era_stake)")
-    return {"network": "PortaldotV3 Test", "chain_id": 420420777, "latest_block": latest[0] if latest else None, "latest_era": era[0]["era"] if era else None, "validator_count": validator_count[0]["count"] if validator_count else 0, "total_stake_pot": stake[0]["total_pot"] if stake else 0, "source": "SQLite collector snapshot"}
+    alerts = db_rows("SELECT id, kind, message, created_at FROM alerts ORDER BY created_at DESC LIMIT 5")
+    return {"network": NETWORK, "chain_id": CHAIN_ID, "latest_block": latest[0] if latest else None, "latest_era": era[0]["era"] if era else None, "validator_count": validator_count[0]["count"] if validator_count else 0, "total_stake_pot": stake[0]["total_pot"] if stake else 0, "alerts": alerts, "source": "SQLite collector snapshot"}
 
 
 @app.get("/api/v1/validators")
@@ -43,7 +60,12 @@ def validators() -> dict[str, Any]:
         FROM validators v JOIN era_stake s ON s.address=v.address
         LEFT JOIN era_points p ON p.address=s.address AND p.era=s.era
         WHERE s.era=(SELECT MAX(era) FROM era_stake) ORDER BY CAST(s.total_pot AS REAL) DESC""")
-    return {"network": "PortaldotV3 Test", "validators": rows}
+    total = sum(_num(row["total_pot"]) for row in rows)
+    for row in rows:
+        share = (_num(row["total_pot"]) / total * 100) if total else 0
+        label, reason = risk_label(_num(row["commission_pct"]), share)
+        row.update({"stake_share_pct": round(share, 2), "risk_label": label, "risk_reason": reason})
+    return {"network": NETWORK, "chain_id": CHAIN_ID, "validators": rows}
 
 
 @app.get("/api/v1/validators/{address}")
@@ -81,6 +103,3 @@ def balance(address: str) -> dict[str, Any]:
 
 
 __all__ = ["app"]
-
-# Keep the public network identity explicit in API responses.
-assert 420420777 == 420420777
