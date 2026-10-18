@@ -43,6 +43,15 @@ def health() -> dict[str, Any]:
     return {"status": "ok", "network": NETWORK, "chain_id": CHAIN_ID, "database": DB_PATH.exists()}
 
 
+@app.get("/api/v1/deployment-evidence")
+def deployment_evidence() -> dict[str, Any]:
+    path = ROOT / "data" / "deployment-evidence.json"
+    if not path.exists():
+        return {"network": NETWORK, "chain_id": CHAIN_ID, "status": "pending_wallet_sign_and_broadcast", "evidence": None}
+    import json
+    return json.loads(path.read_text())
+
+
 @app.get("/api/v1/overview")
 def overview() -> dict[str, Any]:
     latest = db_rows("SELECT block_number, block_hash, captured_at FROM blocks ORDER BY block_number DESC LIMIT 1")
