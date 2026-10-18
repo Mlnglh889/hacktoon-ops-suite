@@ -4,3 +4,6 @@ __pycache__/
 *.py[cod]
 data/*.db
 data/*.sqlite*
+node_modules/
+package-lock.json
+data/heartbeat-payload.json

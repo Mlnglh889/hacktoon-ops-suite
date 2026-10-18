@@ -1,0 +1,27 @@
+{
+  "name": "hacktoon-ops-suite",
+  "version": "1.0.0",
+  "description": "Portaldot Stake Hub is an operational intelligence layer for Portaldot staking: validator health, staking context, alerts, and verifiable on-chain heartbeats.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mlnglh889/hacktoon-ops-suite.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Mlnglh889/hacktoon-ops-suite/issues"
+  },
+  "homepage": "https://github.com/Mlnglh889/hacktoon-ops-suite#readme",
+  "devDependencies": {
+    "solc": "^0.8.30"
+  }
+}
