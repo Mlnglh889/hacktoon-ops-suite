@@ -88,4 +88,4 @@ Run tests:
 
 ## License
 
-Not yet set. Third-party dependencies are listed in `backend/requirements.txt`.
+MIT — see [LICENSE](LICENSE). Third-party dependencies are listed in `backend/requirements.txt`.

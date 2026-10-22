@@ -27,5 +27,4 @@ Build log for the Portaldot Hacker House 2026 submission. Dates are commit dates
 
 - OpsRegistry heartbeat: not deployed. Needs testnet gas and an explicit wallet signer.
 - `data/heartbeat-payload.json`: from an older snapshot (block 71886, era 20). Regenerate before deployment.
-- License: not yet set.
 - Repo visibility: private until 2026-10-24, then public (per owner).
