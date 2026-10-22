@@ -41,10 +41,12 @@ The same configuration boundary allows testnet-to-mainnet-V3 migration without r
 
 - Public GitHub URL intended for submission: `https://github.com/Mlnglh889/hacktoon-ops-suite`
 - Incremental commit history: 6 commits, including the dashboard commit.
-- Backend unit tests: **16 passed**.
+- Backend unit tests: **17 passed**.
 - Local API smoke test: `/`, `/api/v1/health`, `/api/v1/overview`, and `/api/v1/validators` returned HTTP 200.
-- Current local snapshot observed by the API: block `71886`, era `20`, two validators, zero total stake in the captured testnet snapshot.
-- The zero stake value is displayed honestly; no mainnet data is mixed into the V3 testnet dashboard.
+- Latest live read (block 142410, era 39): 2 session validators, `ErasTotalStake` 20,141.32 tPOT.
+- Per-validator exposure for the selected validators is still zero in recent eras; it is shown honestly, not as a fabricated chart.
+- No mainnet data is mixed into the V3 testnet dashboard.
+- Staking test-transactions on the same testnet (see `data/testnet-evidence.md`): stake 1 tPOT, unstake 1 tPOT, nominate 2 validators.
 
 ## Demo flow
 
