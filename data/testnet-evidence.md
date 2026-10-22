@@ -13,6 +13,7 @@ Each entry was read back from chain (block and events), not taken from a UI mess
 | 3 | Stake (web UI) | 1 tPOT | 137079 | 0x8a27c31807a1a6d4393f71090cac7a9471dae90124b58270889cfaa5d3b65db5 | block + events |
 | 4 | Nominate 2 validators | — | 141087 | 0x8a39ff26896508ed7c7741e14c686923c5b27df0947e0a8e663ced6b33c66e17 | ExtrinsicSuccess, 2 targets read back |
 | 5 | Unstake (script) | 1 tPOT | 142760 | 0x74e663fded9a340376781b9bd53c3feb40777cff22e136f569f68e4f05c89aa3 | Staking.unbond, Unbonded + ExtrinsicSuccess, read back at block |
+| 6 | Change validators (nominate only, 01 only) | — | 145577 | 0x202b124cc0cff9f4b77fa1b05a6e0ff39a2c0960a6397ca671587b2a2847a1d3 | Staking.nominate, ExtrinsicSuccess, read back at block; Nominators = [01], bonded unchanged |
 
 Finalized hash for #4: 0x2f1e3afa1d73eae1b031480f204bc9def58fec60dbe04b72878643d6221b83b4
 Finalized hash for #5: 0x83811981dbc0df76c3bb3cbaf00f3d932cebd81eed17fad0c4dfa51c322ca02d
