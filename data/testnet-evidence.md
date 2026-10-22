@@ -12,7 +12,9 @@ Each entry was read back from chain (block and events), not taken from a UI mess
 | 2 | Unstake (script) | 1 tPOT | 136994 | 0x0d4dc1472bdbabffa0027a0277ef37fe41dd9a581f52961631eea70e5db458ba | block + events |
 | 3 | Stake (web UI) | 1 tPOT | 137079 | 0x8a27c31807a1a6d4393f71090cac7a9471dae90124b58270889cfaa5d3b65db5 | block + events |
 | 4 | Nominate 2 validators | — | 141087 | 0x8a39ff26896508ed7c7741e14c686923c5b27df0947e0a8e663ced6b33c66e17 | ExtrinsicSuccess, 2 targets read back |
+| 5 | Unstake (script) | 1 tPOT | 142760 | 0x74e663fded9a340376781b9bd53c3feb40777cff22e136f569f68e4f05c89aa3 | Staking.unbond, Unbonded + ExtrinsicSuccess, read back at block |
 
 Finalized hash for #4: 0x2f1e3afa1d73eae1b031480f204bc9def58fec60dbe04b72878643d6221b83b4
+Finalized hash for #5: 0x83811981dbc0df76c3bb3cbaf00f3d932cebd81eed17fad0c4dfa51c322ca02d
 
 Known limits: selected validators have zero exposure in the last 40 eras, so no real reward split is measurable yet.
