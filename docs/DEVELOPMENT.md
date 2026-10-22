@@ -16,12 +16,13 @@ Build log for the Portaldot Hacker House 2026 submission. Dates are commit dates
 | 2026-10-19 | `e7ce16e` | Verified heartbeat deployment flow |
 | 2026-10-19 | `47e44fd` | Deployment evidence endpoint |
 | 2026-10-22 | `c7be044` | Sync pitch with live V3 read; add testnet tx evidence |
+| 2026-10-22 | `4205034` | Add unstake 1 tPOT tx evidence (block 142760) |
 
 ## Verified state (2026-10-22)
 
 - Backend tests: 17 passed (`.venv/bin/python -m pytest -q`).
 - Live read at block 142410, era 39: 2 session validators, `ErasTotalStake` 20,141.32 tPOT.
-- Stake Hub testnet transactions: see `data/testnet-evidence.md`.
+- Stake Hub testnet transactions: stake 1 tPOT, unstake 1 tPOT, nominate 2 validators. See `data/testnet-evidence.md`.
 
 ## Open items
 
