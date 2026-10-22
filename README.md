@@ -1,53 +1,91 @@
 # Portaldot Ops Suite
 
-Portaldot Stake Hub is an operational intelligence layer for Portaldot staking: validator health, staking context, alerts, and verifiable on-chain heartbeats.
+Read-only operational intelligence for **Portaldot V3 testnet** staking: validator health, stake concentration, commission risk, and verifiable on-chain snapshots.
 
-## Current target
+> Portaldot Hacker House 2026 · Check-in build
 
-Portaldot V3 Testnet:
+## Network
 
-- Substrate WS: `wss://test-node-v3.portaldot.dev`
-- EVM RPC: `https://test-evm-rpc-v3.portaldot.dev`
-- EVM chain ID: `420420777`
-- Explorer: `https://node-console.portaldot.dev`
+| Item | Value |
+|---|---|
+| Substrate WS | `wss://test-node-v3.portaldot.dev` |
+| EVM RPC | `https://test-evm-rpc-v3.portaldot.dev` |
+| EVM chain ID | `420420777` |
+| Explorer | `https://node-console.portaldot.dev` |
+| Token | tPOT (14 decimals) |
 
-## Build evidence
+Testnet only. No mainnet data is mixed into this dashboard.
 
-This repository is the fresh Hacker House implementation. Commits are intentionally incremental so the development timeline remains auditable.
+## What works now
 
-## Local setup
+| Feature | Status |
+|---|---|
+| Collector: block, session validators, era, staking (`ErasStakers`, `ErasValidatorPrefs`, `ErasRewardPoints`) | Working, one-shot run (`--once`) |
+| SQLite snapshot store | Working |
+| Read-only API (`/api/v1/...`) | Working, see list below |
+| Validator health dashboard (`/`) | Working, served by FastAPI |
+| Backend unit tests | 17 passed |
+| OpsRegistry heartbeat contract | Source written, **not deployed** (needs testnet gas and an explicit wallet signer) |
+
+## Related work: Stake Hub
+
+Staking actions on the same testnet were verified on-chain with a separate project, `portaldot-stake-hub`:
+
+- Stake 1 tPOT, unstake 1 tPOT, nominate 2 validators.
+- Tx hashes and blocks: [`data/testnet-evidence.md`](data/testnet-evidence.md).
+
+## Architecture
+
+![Architecture](docs/architecture.svg)
+
+```text
+Portaldot V3 WS ──> collector ──> SQLite ──> API / dashboard / alerts
+Portaldot V3 EVM ──> OpsRegistry heartbeat ──> explorer tx proof (pending deploy)
+```
+
+Layers:
+
+- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`.
+- **Storage** (`backend/schema.sql`): SQLite, local-first.
+- **API** (`backend/api.py`): FastAPI, read-only.
+- **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
+- **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): payload hash prepared; deployment not done.
+
+## Run locally
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r backend/requirements.txt
 cp .env.example .env
-python -m backend.collector --once
-uvicorn backend.api:app --reload
+python -m backend.collector --once      # one snapshot from V3 testnet
+uvicorn backend.api:app --reload        # dashboard at http://127.0.0.1:8000
 ```
 
-Read-only API:
+Run tests:
 
-- `/api/v1/overview`
-- `/api/v1/validators`
-- `/api/v1/validators/{address}`
-- `/api/v1/eras/latest`
-- `/api/v1/blocks`
-- `/api/v1/balance/{ss58_address}` — read-only V3 native POT balance
-
-OpsRegistry deployment remains intentionally blocked until testnet gas and an explicit wallet-controlled signer are available. No private key is stored in this repository.
-
-The collector uses `Session.Validators`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints` for the current era.
-
-## Architecture
-
-```text
-Portaldot V3 WS ──> collector ──> SQLite ──> API/dashboard/alerts
-Portaldot V3 EVM ──> OpsRegistry heartbeat ──> explorer tx proof
+```bash
+.venv/bin/python -m pytest -q
 ```
 
-Third-party dependencies and licenses are listed in `backend/requirements.txt`.
+## API
 
-## Status
+- `GET /api/v1/health`
+- `GET /api/v1/overview`
+- `GET /api/v1/validators`
+- `GET /api/v1/validators/{address}`
+- `GET /api/v1/eras/latest`
+- `GET /api/v1/blocks`
+- `GET /api/v1/balance/{ss58_address}` (read-only native POT balance)
+- `GET /api/v1/deployment-evidence`
 
-Foundation commit: RPC configuration, health checks, SQLite schema, and one-shot collector are being built incrementally.
+## Honest limits
+
+- Recent eras show **zero exposure** for the validators in the testnet snapshot. The dashboard shows that as-is.
+- Risk score is rule-based. It has no long history yet.
+- Heartbeat contract is not deployed. No contract address or heartbeat tx hash exists yet.
+- The payload in `data/heartbeat-payload.json` is from an older snapshot (block 71886, era 20). It must be regenerated before deployment.
+
+## License
+
+Not yet set. Third-party dependencies are listed in `backend/requirements.txt`.
