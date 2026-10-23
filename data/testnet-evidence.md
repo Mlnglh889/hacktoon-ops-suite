@@ -16,6 +16,7 @@ Each entry was read back from chain (block and events), not taken from a UI mess
 | 6 | Change validators (nominate only, 01 only) | — | 145577 | 0x202b124cc0cff9f4b77fa1b05a6e0ff39a2c0960a6397ca671587b2a2847a1d3 | Staking.nominate, ExtrinsicSuccess, read back at block; Nominators = [01], bonded unchanged |
 | 7 | Stake (script, batchAll) | 1 tPOT | 154647 | 0xefcec112533763bedf3bdc5d5688dbd037ad04fa0df01073297da5511481a79a | utility.batchAll, staking.Bonded, ExtrinsicSuccess, read back at block |
 | 8 | Unstake (script) | 1 tPOT | 154661 | 0x95837814ad1a12ca6fd66f3a6a466204924ea02c7efef65e7c1c44b722aa9c6c | staking.unbond, ExtrinsicSuccess, read back at block |
+| 9 | Nominate 01 + 02 | — | 154674 | 0x20f8761792796320860c142d1acd447a6b96e08bdc14be71c862d960e64c726e | staking.nominate, ExtrinsicSuccess, read back at block; Nominators = [01, 02] |
 
 Finalized hash for #4: 0x2f1e3afa1d73eae1b031480f204bc9def58fec60dbe04b72878643d6221b83b4
 Finalized hash for #5: 0x83811981dbc0df76c3bb3cbaf00f3d932cebd81eed17fad0c4dfa51c322ca02d
