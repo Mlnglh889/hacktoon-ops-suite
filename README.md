@@ -49,7 +49,7 @@ Layers:
 - **Storage** (`backend/schema.sql`): SQLite, local-first.
 - **API** (`backend/api.py`): FastAPI, read-only.
 - **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
-- **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): payload hash prepared; deployment not done.
+- **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): contract deployed to Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167, status 1). Heartbeat confirmed: tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` (block 159265, status 1, `heartbeatCount` = 1). Evidence: `data/deployment-evidence.json`.
 
 ## Run locally
 

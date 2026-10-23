@@ -1,0 +1,20 @@
+{
+  "network": "PortaldotV3 Test",
+  "chain_id": 420420777,
+  "contract_name": "OpsRegistry",
+  "contract_address": "0x132748201FbCB051CA6D73d26f27540a214d1336",
+  "deployer": "0x3e67093fdbC64648D7F242c02D012CB4091f3610",
+  "owner_verified_onchain": "0x3e67093fdbC64648D7F242c02D012CB4091f3610",
+  "deploy_tx_hash": "0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20",
+  "heartbeat_tx_hash": "0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77",
+  "receipt_status": 1,
+  "block_number": 159167,
+  "deployed_code_bytes": 528,
+  "compiler": "solc 0.8.30, optimizer 200 runs, evm cancun",
+  "explorer_url": "https://scanner-testnet-v3.portaldot.dev/#/extrinsics/0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20",
+  "explorer_url_note": "EVM tx links use the Substrate-style scanner path; RPC receipts are the primary verification.",
+  "status": "deployed_and_heartbeat_confirmed",
+  "heartbeat_block_number": 159265,
+  "heartbeat_payload_sha256": "0x4e4f8694c81cb165b8e31498004a985992a466778ac931883bc7af09975b1766",
+  "heartbeat_explorer_url": "https://scanner-testnet-v3.portaldot.dev/#/extrinsics/0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77"
+}
