@@ -1,6 +1,6 @@
 # Portaldot Ops Suite
 
-Read-only operational intelligence for **Portaldot V3 testnet** staking: validator health, stake concentration, commission risk, and verifiable on-chain snapshots.
+**Staking on Portaldot V3 is blind.** You lock tPOT with a validator without seeing how concentrated the stake is, or whether the commission quietly changed. Ops Suite reads the chain directly and shows validator health, stake concentration, and commission risk on one screen. Each number is tied to a specific block, and the snapshot is saved so anyone can re-check it.
 
 > Portaldot Hacker House 2026 · Check-in build
 
