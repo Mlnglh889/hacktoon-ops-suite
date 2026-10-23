@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
 <title id="title">Portaldot Ops Suite architecture</title>
-<desc id="desc">Two parts on one Portaldot V3 testnet. Ops Suite reads chain state read-only into SQLite and serves a dashboard. Stake Hub lets a user sign stake, unstake and nominate transactions with a browser wallet. OpsRegistry on the EVM side stores heartbeat proofs.</desc>
+<desc id="desc">Two parts on one Portaldot V3 testnet. Ops Suite reads chain state into SQLite and serves a dashboard. Stake Hub lets a user sign stake, unstake and nominate transactions with a browser wallet. OpsRegistry on the EVM side stores heartbeat proofs.</desc>
 <defs><marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#48d6c2"/></marker>
 <marker id="w" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f5b942"/></marker></defs>
 <rect width="1200" height="640" fill="#08111f"/>
 <g font-family="Inter,Arial,sans-serif" fill="#eef6ff">
 <text x="48" y="50" font-size="28" font-weight="700">Portaldot Ops Suite</text>
-<text x="48" y="78" fill="#93a9c4" font-size="15">Read-only validator intelligence, plus stake and unstake with your own wallet</text>
+<text x="48" y="78" fill="#93a9c4" font-size="15">Validator intelligence, plus stake and unstake with your own wallet</text>
 
 <!-- chain -->
 <g stroke="#8fa3bf" stroke-width="2" fill="#0d1d30"><rect x="455" y="100" width="290" height="110" rx="14"/></g>
@@ -32,7 +32,7 @@
 <text x="845" y="430" font-size="18" text-anchor="middle">Wallet extension</text>
 <text x="845" y="456" font-size="13" text-anchor="middle" fill="#93a9c4">you sign each tx yourself</text>
 <text x="845" y="558" font-size="18" text-anchor="middle">Stake Hub API :8100</text>
-<text x="845" y="578" font-size="13" text-anchor="middle" fill="#93a9c4">read-only cache, 60 s</text>
+<text x="845" y="578" font-size="13" text-anchor="middle" fill="#93a9c4">cached reads, 60 s</text>
 
 <!-- OpsRegistry bottom center -->
 <g stroke="#b48cff" stroke-width="2" fill="#1d1532"><rect x="480" y="490" width="240" height="100" rx="14"/></g>
@@ -51,7 +51,7 @@
 <path d="M845 480 L845 520" stroke="#f5b942" stroke-width="2" fill="none" marker-end="url(#w)"/>
 
 <!-- legend -->
-<text x="48" y="625" font-size="13" fill="#48d6c2">■ read-only path</text>
+<text x="48" y="625" font-size="13" fill="#48d6c2">■ chain read path</text>
 <text x="260" y="625" font-size="13" fill="#f5b942">■ user-signed transaction path</text>
 <text x="640" y="625" font-size="13" fill="#b48cff">■ EVM heartbeat proof</text>
 </g></svg>
