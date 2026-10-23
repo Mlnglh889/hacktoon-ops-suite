@@ -16,7 +16,7 @@
 
 <!-- ops suite left column -->
 <g stroke="#48d6c2" stroke-width="2" fill="#10263b"><rect x="55" y="250" width="250" height="100" rx="14"/><rect x="55" y="390" width="250" height="90" rx="14"/><rect x="55" y="520" width="250" height="70" rx="14"/></g>
-<text x="180" y="290" font-size="18" text-anchor="middle">Collector (read-only)</text>
+<text x="180" y="290" font-size="18" text-anchor="middle">Collector</text>
 <text x="180" y="316" font-size="13" text-anchor="middle" fill="#93a9c4">Session, era, ErasStakers,</text>
 <text x="180" y="334" font-size="13" text-anchor="middle" fill="#93a9c4">ValidatorPrefs, RewardPoints</text>
 <text x="180" y="430" font-size="18" text-anchor="middle">SQLite snapshots</text>
@@ -28,7 +28,7 @@
 <g stroke="#f5b942" stroke-width="2" fill="#2a2010"><rect x="745" y="250" width="200" height="100" rx="14"/><rect x="745" y="390" width="200" height="90" rx="14"/><rect x="745" y="520" width="200" height="70" rx="14"/></g>
 <text x="845" y="288" font-size="18" text-anchor="middle">Stake Hub UI</text>
 <text x="845" y="314" font-size="13" text-anchor="middle" fill="#93a9c4">Stake · Unstake · Nominate</text>
-<text x="845" y="334" font-size="13" text-anchor="middle" fill="#93a9c4">Set validators (max 2)</text>
+<text x="845" y="334" font-size="13" text-anchor="middle" fill="#93a9c4">Set validators</text>
 <text x="845" y="430" font-size="18" text-anchor="middle">Wallet extension</text>
 <text x="845" y="456" font-size="13" text-anchor="middle" fill="#93a9c4">you sign each tx yourself</text>
 <text x="845" y="558" font-size="18" text-anchor="middle">Stake Hub API :8100</text>

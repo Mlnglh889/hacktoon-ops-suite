@@ -40,13 +40,13 @@ Staking actions on the same testnet were verified on-chain with a separate proje
 
 Two parts share one Portaldot V3 testnet and never mix data:
 
-- **Ops Suite (read-only):** a collector reads validator, era, exposure, commission and reward-point data from chain, stores snapshots in SQLite, and serves a dashboard and API. It never signs anything.
+- **Ops Suite:** a collector reads validator, era, exposure, commission and reward-point data from chain, stores snapshots in SQLite, and serves a dashboard and API. It never signs anything.
 - **Stake Hub (user-signed):** the web app lets a user **stake**, **unstake** and **nominate** (set validators, max 2). The browser builds each extrinsic and the user's own wallet extension signs it. The backend only serves a short-cached read.
 
 Heartbeat proof is a separate EVM path: `OpsRegistry` on Portaldot V3 EVM stores heartbeat payload hashes.
 
 ```text
-Portaldot V3 Substrate WS ──> collector (read-only) ──> SQLite ──> API / dashboard
+Portaldot V3 Substrate WS ──> collector ──> SQLite ──> API / dashboard
 Stake Hub UI ──> wallet extension (user signs) ──> Portaldot V3 Substrate WS
 Portaldot V3 EVM RPC ──> OpsRegistry heartbeat ──> RPC receipt proof
 ```
