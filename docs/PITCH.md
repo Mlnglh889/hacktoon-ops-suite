@@ -2,7 +2,7 @@
 
 ## The hook
 
-Stake on Portaldot V3 and you are trusting two numbers you can't easily see: how much of the network sits behind each validator, and whether that validator's commission or concentration is quietly becoming a risk. Ops Suite turns the raw chain state into a read-only health view, and every number on screen traces back to a block you can open.
+**Staking on Portaldot V3 is blind.** You lock tPOT with a validator without seeing how concentrated the stake is, or whether the commission quietly changed. Ops Suite reads the chain directly and shows validator health, stake concentration, and commission risk on one screen. The numbers come from chain storage, each tied to a specific block, and the snapshot is saved so anyone can re-check it.
 
 ## What it shows (live, read-only)
 
