@@ -1,6 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
-<title id="title">Portaldot Ops Suite architecture</title><desc id="desc">Portaldot V3 testnet feeds a collector, SQLite, APIs, dashboard, alerts and heartbeat proof.</desc>
-<rect width="1200" height="420" fill="#08111f"/><g font-family="Inter,Arial,sans-serif" fill="#eef6ff"><text x="48" y="54" font-size="28" font-weight="700">Portaldot Ops Suite</text><text x="48" y="82" fill="#93a9c4" font-size="15">Validator intelligence, staking context, alerts, and verifiable activity</text>
-<g stroke="#48d6c2" stroke-width="2" fill="#10263b"><rect x="55" y="145" width="245" height="120" rx="14"/><rect x="365" y="145" width="205" height="120" rx="14"/><rect x="635" y="145" width="205" height="120" rx="14"/><rect x="905" y="95" width="230" height="95" rx="14"/><rect x="905" y="220" width="230" height="95" rx="14"/></g>
-<g font-size="18" text-anchor="middle"><text x="177" y="182">Portaldot V3</text><text x="177" y="210" fill="#93a9c4" font-size="14">Substrate WS + EVM RPC</text><text x="467" y="182">Collector</text><text x="467" y="210" fill="#93a9c4" font-size="14">health / blocks / eras</text><text x="737" y="182">SQLite</text><text x="737" y="210" fill="#93a9c4" font-size="14">historical evidence</text><text x="1020" y="134">Dashboard + Kyki</text><text x="1020" y="162" fill="#93a9c4" font-size="14">validator decisions</text><text x="1020" y="259">Alerts + OpsRegistry</text><text x="1020" y="287" fill="#93a9c4" font-size="14">Telegram + tx proof</text></g>
-<g stroke="#f5c76b" stroke-width="3" fill="none"><path d="M300 205h65"/><path d="M570 205h65"/><path d="M840 175h65"/><path d="M840 235h65"/></g><g fill="#f5c76b"><path d="m360 205-10-7v14z"/><path d="m630 205-10-7v14z"/><path d="m900 175-10-7v14z"/><path d="m900 235-10-7v14z"/></g></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+<title id="title">Portaldot Ops Suite architecture</title>
+<desc id="desc">Two parts on one Portaldot V3 testnet. Ops Suite reads chain state read-only into SQLite and serves a dashboard. Stake Hub lets a user sign stake, unstake and nominate transactions with a browser wallet. OpsRegistry on the EVM side stores heartbeat proofs.</desc>
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#48d6c2"/></marker>
+<marker id="w" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f5b942"/></marker></defs>
+<rect width="1200" height="640" fill="#08111f"/>
+<g font-family="Inter,Arial,sans-serif" fill="#eef6ff">
+<text x="48" y="50" font-size="28" font-weight="700">Portaldot Ops Suite</text>
+<text x="48" y="78" fill="#93a9c4" font-size="15">Read-only validator intelligence, plus stake and unstake with your own wallet</text>
+
+<!-- chain -->
+<g stroke="#8fa3bf" stroke-width="2" fill="#0d1d30"><rect x="455" y="100" width="290" height="110" rx="14"/></g>
+<text x="600" y="140" font-size="19" text-anchor="middle" font-weight="700">Portaldot V3 testnet</text>
+<text x="600" y="168" font-size="14" text-anchor="middle" fill="#93a9c4">Substrate WS: test-node-v3</text>
+<text x="600" y="190" font-size="14" text-anchor="middle" fill="#93a9c4">EVM RPC (chain 420420777)</text>
+
+<!-- ops suite left column -->
+<g stroke="#48d6c2" stroke-width="2" fill="#10263b"><rect x="55" y="250" width="250" height="100" rx="14"/><rect x="55" y="390" width="250" height="90" rx="14"/><rect x="55" y="520" width="250" height="70" rx="14"/></g>
+<text x="180" y="290" font-size="18" text-anchor="middle">Collector (read-only)</text>
+<text x="180" y="316" font-size="13" text-anchor="middle" fill="#93a9c4">Session, era, ErasStakers,</text>
+<text x="180" y="334" font-size="13" text-anchor="middle" fill="#93a9c4">ValidatorPrefs, RewardPoints</text>
+<text x="180" y="430" font-size="18" text-anchor="middle">SQLite snapshots</text>
+<text x="180" y="456" font-size="13" text-anchor="middle" fill="#93a9c4">one row per block / era</text>
+<text x="180" y="558" font-size="18" text-anchor="middle">FastAPI + dashboard</text>
+<text x="180" y="578" font-size="13" text-anchor="middle" fill="#93a9c4">health, concentration, commission</text>
+
+<!-- stake hub right column -->
+<g stroke="#f5b942" stroke-width="2" fill="#2a2010"><rect x="745" y="250" width="200" height="100" rx="14"/><rect x="745" y="390" width="200" height="90" rx="14"/><rect x="745" y="520" width="200" height="70" rx="14"/></g>
+<text x="845" y="288" font-size="18" text-anchor="middle">Stake Hub UI</text>
+<text x="845" y="314" font-size="13" text-anchor="middle" fill="#93a9c4">Stake · Unstake · Nominate</text>
+<text x="845" y="334" font-size="13" text-anchor="middle" fill="#93a9c4">Set validators (max 2)</text>
+<text x="845" y="430" font-size="18" text-anchor="middle">Wallet extension</text>
+<text x="845" y="456" font-size="13" text-anchor="middle" fill="#93a9c4">you sign each tx yourself</text>
+<text x="845" y="558" font-size="18" text-anchor="middle">Stake Hub API :8100</text>
+<text x="845" y="578" font-size="13" text-anchor="middle" fill="#93a9c4">read-only cache, 60 s</text>
+
+<!-- OpsRegistry bottom center -->
+<g stroke="#b48cff" stroke-width="2" fill="#1d1532"><rect x="480" y="490" width="240" height="100" rx="14"/></g>
+<text x="600" y="528" font-size="18" text-anchor="middle">OpsRegistry (EVM)</text>
+<text x="600" y="554" font-size="13" text-anchor="middle" fill="#93a9c4">0x1327…1336</text>
+<text x="600" y="574" font-size="13" text-anchor="middle" fill="#93a9c4">heartbeat proofs · 1 confirmed</text>
+
+<!-- arrows: read paths (teal) -->
+<path d="M455 170 L305 290" stroke="#48d6c2" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<path d="M180 350 L180 390" stroke="#48d6c2" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<path d="M180 480 L180 520" stroke="#48d6c2" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<path d="M600 210 L600 490" stroke="#b48cff" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#a)"/>
+
+<!-- arrows: stake hub (amber) -->
+<path d="M845 350 L845 390" stroke="#f5b942" stroke-width="2" fill="none" marker-end="url(#w)"/>
+<path d="M845 480 L845 520" stroke="#f5b942" stroke-width="2" fill="none" marker-end="url(#w)"/>
+
+<!-- legend -->
+<text x="48" y="625" font-size="13" fill="#48d6c2">■ read-only path</text>
+<text x="260" y="625" font-size="13" fill="#f5b942">■ user-signed transaction path</text>
+<text x="640" y="625" font-size="13" fill="#b48cff">■ EVM heartbeat proof</text>
+</g></svg>

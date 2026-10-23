@@ -38,17 +38,26 @@ Staking actions on the same testnet were verified on-chain with a separate proje
 
 ![Architecture](docs/architecture.svg)
 
+Two parts share one Portaldot V3 testnet and never mix data:
+
+- **Ops Suite (read-only):** a collector reads validator, era, exposure, commission and reward-point data from chain, stores snapshots in SQLite, and serves a dashboard and API. It never signs anything.
+- **Stake Hub (user-signed):** the web app lets a user **stake**, **unstake** and **nominate** (set validators, max 2). The browser builds each extrinsic and the user's own wallet extension signs it. The backend only serves a short-cached read.
+
+Heartbeat proof is a separate EVM path: `OpsRegistry` on Portaldot V3 EVM stores heartbeat payload hashes.
+
 ```text
-Portaldot V3 WS ──> collector ──> SQLite ──> API / dashboard / alerts
-Portaldot V3 EVM ──> OpsRegistry heartbeat ──> RPC receipt proof (deployed, heartbeat confirmed)
+Portaldot V3 Substrate WS ──> collector (read-only) ──> SQLite ──> API / dashboard
+Stake Hub UI ──> wallet extension (user signs) ──> Portaldot V3 Substrate WS
+Portaldot V3 EVM RPC ──> OpsRegistry heartbeat ──> RPC receipt proof
 ```
 
 Layers:
 
-- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`.
+- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`. Known gap: `ErasStakers` is empty on this runtime; the same data is in `Staking.ErasStakersOverview`.
 - **Storage** (`backend/schema.sql`): SQLite, local-first.
 - **API** (`backend/api.py`): FastAPI, read-only.
 - **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
+- **Stake Hub** (`apps/web`, `backend/app`): React app for stake, unstake and nominate. Each action shows a TxToast with the extrinsic hash and explorer link. Backend caches `/network` and `/validators` for 60 s.
 - **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): contract deployed to Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167, status 1). Heartbeat confirmed: tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` (block 159265, status 1, `heartbeatCount` = 1). Evidence: `data/deployment-evidence.json`.
 
 ## Run locally
