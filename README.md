@@ -4,6 +4,8 @@
 
 > Portaldot Hacker House 2026 · Check-in build
 
+**Demo video:** https://x.com/Lannna4332/status/2113643661250719786
+
 ## Network
 
 | Item | Value |
