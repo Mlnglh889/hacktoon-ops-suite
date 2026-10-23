@@ -49,7 +49,9 @@ def collect_once() -> dict[str, Any]:
         rows: list[dict[str, Any]] = []
         points = normalize_points(_query(ss, "Staking", "ErasRewardPoints", [era]))
         for address in active:
-            exposure = normalize_exposure(_query(ss, "Staking", "ErasStakers", [era, address]))
+            # ErasStakersOverview is the populated source on this runtime; the legacy
+            # ErasStakers map returns zeros here, so we no longer read it.
+            exposure = normalize_exposure(_query(ss, "Staking", "ErasStakersOverview", [era, address]))
             commission = normalize_commission(_query(ss, "Staking", "ErasValidatorPrefs", [era, address]))
             network_total += int(float(exposure["total_pot"]) * 10**14)
             rows.append({"address": address, "exposure": exposure, "commission_pct": commission, "points": points.get(address, 0)})

@@ -53,7 +53,7 @@ Portaldot V3 EVM RPC ──> OpsRegistry heartbeat ──> RPC receipt proof
 
 Layers:
 
-- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`. Known gap: `ErasStakers` is empty on this runtime; the same data is in `Staking.ErasStakersOverview`.
+- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakersOverview`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`. The legacy `ErasStakers` map is empty on this runtime, so it is no longer read.
 - **Storage** (`backend/schema.sql`): SQLite, local-first.
 - **API** (`backend/api.py`): FastAPI, read-only.
 - **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
@@ -90,7 +90,7 @@ Run tests:
 
 ## Honest limits
 
-- Recent eras show **zero exposure** for the validators in the testnet snapshot. The dashboard shows that as-is.
+- Exposure comes from `ErasStakersOverview`. Eras before the snapshot window may show only the genesis self-stake (about 9,999.99 tPOT, 0 nominators), which is what the chain returns.
 - Risk score is rule-based. It has no long history yet.
 - OpsRegistry is deployed (`0x132748201FbCB051CA6D73d26f27540a214d1336`) and one heartbeat is confirmed (`0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`, block 159265). Only one heartbeat has been sent so far; the payload snapshot is from block 159240 and is not refreshed continuously.
 - The payload in `data/heartbeat-payload.json` is from an older snapshot (block 71886, era 20). It must be regenerated before deployment.

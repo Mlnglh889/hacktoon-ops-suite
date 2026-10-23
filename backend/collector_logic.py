@@ -30,6 +30,8 @@ def normalize_commission(prefs: Any) -> str:
 
 
 def normalize_exposure(exposure: Any) -> dict[str, Any]:
+    """Accepts ErasStakersOverview ({total, own, nominator_count, page_count})
+    or the legacy ErasStakers ({total, own, others}) shape."""
     if not isinstance(exposure, dict):
         return {'total_pot': '0', 'own_pot': '0', 'nominator_count': 0}
     def pot(key: str) -> str:
@@ -37,8 +39,15 @@ def normalize_exposure(exposure: Any) -> dict[str, Any]:
             return format((Decimal(str(exposure.get(key, 0))) / RAW_PER_POT).normalize(), 'f')
         except Exception:
             return '0'
-    others = exposure.get('others') or []
-    return {'total_pot': pot('total'), 'own_pot': pot('own'), 'nominator_count': len(others) if isinstance(others, (list, tuple)) else 0}
+    others = exposure.get('others')
+    if isinstance(others, (list, tuple)):
+        nominators = len(others)
+    else:
+        try:
+            nominators = int(exposure.get('nominator_count', 0))
+        except (TypeError, ValueError):
+            nominators = 0
+    return {'total_pot': pot('total'), 'own_pot': pot('own'), 'nominator_count': nominators}
 
 
 def normalize_points(rewards: Any) -> dict[str, int]:

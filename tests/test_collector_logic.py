@@ -26,3 +26,15 @@ def test_normalize_points_handles_missing_data():
     assert normalize_points(None) == {}
     assert normalize_exposure(None) == {'total_pot': '0', 'own_pot': '0', 'nominator_count': 0}
     assert normalize_commission(None) == '0'
+
+
+def test_normalize_exposure_reads_eras_stakers_overview_shape():
+    # Shape returned by Staking.ErasStakersOverview on Portaldot V3 (era 44, validator 5F4ZyJ...)
+    result = normalize_exposure({'total': 1007935895192072112, 'own': 1007214501342156696, 'nominator_count': 2, 'page_count': 1})
+    assert result['nominator_count'] == 2
+    assert result['total_pot'] == '10079.35895192072112'
+    assert result['own_pot'] == '10072.14501342156696'
+
+
+def test_normalize_exposure_overview_zero_is_zero():
+    assert normalize_exposure({'total': 0, 'own': 0, 'nominator_count': 0, 'page_count': 0}) == {'total_pot': '0', 'own_pot': '0', 'nominator_count': 0}

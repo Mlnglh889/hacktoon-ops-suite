@@ -15,7 +15,9 @@
 
 ## Why this matters to a judge
 
-- **Honest by design.** We report the chain's numbers as they are, and we name the known gap: the collector currently reads the older `ErasStakers` storage, see Known limits.
+- **Different from a validator-list dashboard.** Other entries in this category monitor node uptime with hardcoded demo data. Ops Suite reads stake concentration and commission from live chain storage, and anchors the snapshot to a block.
+
+- **Honest by design.** We report the chain's numbers as they are, and we name the limits we know of (see Known limits).
 - **Every number is reproducible.** The snapshot is persisted in SQLite, and the chain reads come from `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakersOverview`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints`.
 - **It is on-chain too.** OpsRegistry is deployed on Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167). One heartbeat is confirmed at tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`, block 159265, `heartbeatCount() = 1`.
 - **Real transactions on the same testnet** (see `data/testnet-evidence.md`): stake, unstake, and nominate, each read back from chain.
@@ -30,7 +32,7 @@
 
 ## Known limits (stated up front)
 
-- The dashboard collector still reads `Staking.ErasStakers`, which is empty on this runtime, so the UI can show zero exposure. The on-chain data is in `Staking.ErasStakersOverview`. Fixing that is a code change, not part of this doc update.
+- Only one testnet snapshot is shown here (era 44). Historical eras and reward payouts are not yet covered.
 - Only one heartbeat has been sent. The payload snapshot is from block 159240 and is not refreshed continuously.
 - Commission and risk labels are rule-based, not a model.
 
