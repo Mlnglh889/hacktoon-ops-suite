@@ -8,14 +8,14 @@ Each entry was read back from chain (block and events), not taken from a UI mess
 
 | # | Action | Amount | Block | txHash | Check |
 |---|---|---|---|---|---|
-| 1 | Stake (script) | 1 tPOT | 136839 | 0x36f107f6f4fbc703ed4305c5490b969d99240d26ff905cbd9d0db93cdf96440a | block + events |
-| 2 | Unstake (script) | 1 tPOT | 136994 | 0x0d4dc1472bdbabffa0027a0277ef37fe41dd9a581f52961631eea70e5db458ba | block + events |
-| 3 | Stake (web UI) | 1 tPOT | 137079 | 0x8a27c31807a1a6d4393f71090cac7a9471dae90124b58270889cfaa5d3b65db5 | block + events |
+| 1 | Stake | 1 tPOT | 136839 | 0x36f107f6f4fbc703ed4305c5490b969d99240d26ff905cbd9d0db93cdf96440a | block + events |
+| 2 | Unstake | 1 tPOT | 136994 | 0x0d4dc1472bdbabffa0027a0277ef37fe41dd9a581f52961631eea70e5db458ba | block + events |
+| 3 | Stake  | 1 tPOT | 137079 | 0x8a27c31807a1a6d4393f71090cac7a9471dae90124b58270889cfaa5d3b65db5 | block + events |
 | 4 | Nominate 2 validators | — | 141087 | 0x8a39ff26896508ed7c7741e14c686923c5b27df0947e0a8e663ced6b33c66e17 | ExtrinsicSuccess, 2 targets read back |
-| 5 | Unstake (script) | 1 tPOT | 142760 | 0x74e663fded9a340376781b9bd53c3feb40777cff22e136f569f68e4f05c89aa3 | Staking.unbond, Unbonded + ExtrinsicSuccess, read back at block |
+| 5 | Unstake | 1 tPOT | 142760 | 0x74e663fded9a340376781b9bd53c3feb40777cff22e136f569f68e4f05c89aa3 | Staking.unbond, Unbonded + ExtrinsicSuccess, read back at block |
 | 6 | Change validators (nominate only, 01 only) | — | 145577 | 0x202b124cc0cff9f4b77fa1b05a6e0ff39a2c0960a6397ca671587b2a2847a1d3 | Staking.nominate, ExtrinsicSuccess, read back at block; Nominators = [01], bonded unchanged |
-| 7 | Stake (script, batchAll) | 1 tPOT | 154647 | 0xefcec112533763bedf3bdc5d5688dbd037ad04fa0df01073297da5511481a79a | utility.batchAll, staking.Bonded, ExtrinsicSuccess, read back at block |
-| 8 | Unstake (script) | 1 tPOT | 154661 | 0x95837814ad1a12ca6fd66f3a6a466204924ea02c7efef65e7c1c44b722aa9c6c | staking.unbond, ExtrinsicSuccess, read back at block |
+| 7 | Stake  batchAll | 1 tPOT | 154647 | 0xefcec112533763bedf3bdc5d5688dbd037ad04fa0df01073297da5511481a79a | utility.batchAll, staking.Bonded, ExtrinsicSuccess, read back at block |
+| 8 | Unstake  | 1 tPOT | 154661 | 0x95837814ad1a12ca6fd66f3a6a466204924ea02c7efef65e7c1c44b722aa9c6c | staking.unbond, ExtrinsicSuccess, read back at block |
 | 9 | Nominate 01 + 02 | — | 154674 | 0x20f8761792796320860c142d1acd447a6b96e08bdc14be71c862d960e64c726e | staking.nominate, ExtrinsicSuccess, read back at block; Nominators = [01, 02] |
 
 Finalized hash for #4: 0x2f1e3afa1d73eae1b031480f204bc9def58fec60dbe04b72878643d6221b83b4
