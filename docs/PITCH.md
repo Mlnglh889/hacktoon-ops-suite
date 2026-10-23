@@ -1,52 +1,38 @@
-# Portaldot Ops Suite — Hackathon Pitch
+# Portaldot Ops Suite: Validator Health for PortaldotV3 Testnet
 
-## One-line pitch
+## The hook
 
-Portaldot Ops Suite turns raw V3 staking data into an evidence-ready operational view of validator health, stake concentration, commission risk, and network freshness.
+Stake on Portaldot V3 and you are trusting two numbers you can't easily see: how much of the network sits behind each validator, and whether that validator's commission or concentration is quietly becoming a risk. Ops Suite turns the raw chain state into a read-only health view, and every number on screen traces back to a block you can open.
 
-## The problem
+## What it shows (live, read-only)
 
-Portaldot staking participants need to answer basic operational questions quickly:
+- **Snapshot anchor:** block 159438, finalized 159435, era 44.
+- **Session validators:** 2 (`5F4ZyJ…BfYY` and `5Grj5u…hwjk`).
+- **Total era stake:** 20,158.72 tPOT.
+- **Stake concentration (era 44, `erasStakersOverview`):** each validator holds 10,079.36 tPOT, a 50/50 split. Validator `5F4ZyJ…BfYY` has 2 nominators, `5Grj5u…hwjk` has 1. Own stake is 10,072.15 and 10,072.45 tPOT.
+- **Commission risk (`erasValidatorPrefs`):** `5F4ZyJ…BfYY` at 0%, `5Grj5u…hwjk` at 1%.
+- **Reward points (era 44):** 37,560 total.
 
-- Is the network snapshot fresh?
-- Which validators are active?
-- How much stake is concentrated in each validator?
-- Is commission or concentration becoming a risk?
-- Can a demo or alert be backed by a verifiable chain snapshot?
+## Why this matters to a judge
 
-Raw chain RPC data is powerful but not an operator-friendly product.
+- **Honest by design.** We report the chain's numbers as they are, and we name the known gap: the collector currently reads the older `ErasStakers` storage, see Known limits.
+- **Every number is reproducible.** The snapshot is persisted in SQLite, and the chain reads come from `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakersOverview`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints`.
+- **It is on-chain too.** OpsRegistry is deployed on Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167). One heartbeat is confirmed at tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`, block 159265, `heartbeatCount() = 1`.
+- **Real transactions on the same testnet** (see `data/testnet-evidence.md`): stake, unstake, and nominate, each read back from chain.
 
-## The solution
+## Architecture (one screen)
 
-Ops Suite is a read-only intelligence layer:
+1. **Collector:** reads block, session-validator, era-staking, commission, and reward-point data from `wss://test-node-v3.portaldot.dev`.
+2. **Storage:** SQLite, local-first, one row per snapshot.
+3. **API:** FastAPI, read-only.
+4. **Dashboard:** validator health, stake share, commission, and a rule-based risk label.
+5. **OpsRegistry:** the heartbeat contract above, for on-chain proof of a snapshot.
 
-1. A Portaldot V3 Substrate collector reads block, session-validator, era-staking, commission, and reward-point data.
-2. SQLite persists snapshots for repeatable inspection and evidence.
-3. FastAPI exposes a small read-only API.
-4. The dashboard turns the API into a clear validator-health view.
-5. OpsRegistry is deployed on Portaldot V3 EVM (`0x132748201FbCB051CA6D73d26f27540a214d1336`) and one heartbeat is confirmed on-chain (`0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`).
+## Known limits (stated up front)
 
-## Why Portaldot is essential
-
-This product is built around Portaldot V3 data structures and network identity, not generic placeholder data:
-
-- Portaldot V3 Substrate WS: `wss://test-node-v3.portaldot.dev`
-- Portaldot V3 EVM RPC: `https://test-evm-rpc-v3.portaldot.dev`
-- Chain ID: `420420777`
-- Collector methods include `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakers`, `Staking.ErasValidatorPrefs`, and `Staking.ErasRewardPoints`.
-
-The same configuration boundary allows testnet-to-mainnet-V3 migration without rewriting the product logic.
-
-## Current verified state
-
-- Public GitHub URL intended for submission: `https://github.com/Mlnglh889/hacktoon-ops-suite`
-- Incremental commit history: 6 commits, including the dashboard commit.
-- Backend unit tests: **17 passed**.
-- Local API smoke test: `/`, `/api/v1/health`, `/api/v1/overview`, and `/api/v1/validators` returned HTTP 200.
-- Latest live read (block 142410, era 39): 2 session validators, `ErasTotalStake` 20,141.32 tPOT.
-- Per-validator exposure for the selected validators is still zero in recent eras; it is shown honestly, not as a fabricated chart.
-- No mainnet data is mixed into the V3 testnet dashboard.
-- Staking test-transactions on the same testnet (see `data/testnet-evidence.md`): stake 1 tPOT, unstake 1 tPOT, nominate 2 validators.
+- The dashboard collector still reads `Staking.ErasStakers`, which is empty on this runtime, so the UI can show zero exposure. The on-chain data is in `Staking.ErasStakersOverview`. Fixing that is a code change, not part of this doc update.
+- Only one heartbeat has been sent. The payload snapshot is from block 159240 and is not refreshed continuously.
+- Commission and risk labels are rule-based, not a model.
 
 ## Demo flow
 
@@ -93,7 +79,7 @@ The same configuration boundary allows testnet-to-mainnet-V3 migration without r
 - The current deployment is not yet public.
 - Heartbeat deployment is intentionally blocked until testnet gas and an explicit signer are available.
 - Risk scoring is rule-based and will gain more historical factors over additional eras.
-- A sparse testnet snapshot may have zero stake; the UI preserves that fact rather than fabricating a chart.
+- Only two validators are active on this testnet, so concentration is a 50/50 split; a richer picture needs more validators.
 
 ## Third-party disclosure
 
