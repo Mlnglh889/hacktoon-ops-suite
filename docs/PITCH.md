@@ -24,7 +24,7 @@ Ops Suite is a read-only intelligence layer:
 2. SQLite persists snapshots for repeatable inspection and evidence.
 3. FastAPI exposes a small read-only API.
 4. The dashboard turns the API into a clear validator-health view.
-5. An OpsRegistry heartbeat proof path is prepared for a later wallet-controlled testnet deployment.
+5. OpsRegistry is deployed on Portaldot V3 EVM (`0x132748201FbCB051CA6D73d26f27540a214d1336`) and one heartbeat is confirmed on-chain (`0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`).
 
 ## Why Portaldot is essential
 

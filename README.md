@@ -25,7 +25,7 @@ Testnet only. No mainnet data is mixed into this dashboard.
 | Read-only API (`/api/v1/...`) | Working, see list below |
 | Validator health dashboard (`/`) | Working, served by FastAPI |
 | Backend unit tests | 17 passed |
-| OpsRegistry heartbeat contract | Source written, **not deployed** (needs testnet gas and an explicit wallet signer) |
+| OpsRegistry heartbeat contract | **Deployed and heartbeat confirmed** on Portaldot V3 EVM (chain 420420777): `0x132748201FbCB051CA6D73d26f27540a214d1336`, deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, heartbeat tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` |
 
 ## Related work: Stake Hub
 
@@ -40,7 +40,7 @@ Staking actions on the same testnet were verified on-chain with a separate proje
 
 ```text
 Portaldot V3 WS ──> collector ──> SQLite ──> API / dashboard / alerts
-Portaldot V3 EVM ──> OpsRegistry heartbeat ──> explorer tx proof (pending deploy)
+Portaldot V3 EVM ──> OpsRegistry heartbeat ──> RPC receipt proof (deployed, heartbeat confirmed)
 ```
 
 Layers:
@@ -83,7 +83,7 @@ Run tests:
 
 - Recent eras show **zero exposure** for the validators in the testnet snapshot. The dashboard shows that as-is.
 - Risk score is rule-based. It has no long history yet.
-- Heartbeat contract is not deployed. No contract address or heartbeat tx hash exists yet.
+- OpsRegistry is deployed (`0x132748201FbCB051CA6D73d26f27540a214d1336`) and one heartbeat is confirmed (`0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`, block 159265). Only one heartbeat has been sent so far; the payload snapshot is from block 159240 and is not refreshed continuously.
 - The payload in `data/heartbeat-payload.json` is from an older snapshot (block 71886, era 20). It must be regenerated before deployment.
 
 ## License
