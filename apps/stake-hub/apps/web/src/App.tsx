@@ -70,7 +70,7 @@ export default function App() {
       {isHome && <CosmicBackground />}
       <SideNav />
       <div className="lg:pl-[182px] flex flex-col min-h-screen">
-        {(isHome || loc.pathname === '/stake') && (
+        {(isHome || loc.pathname === '/stake' || loc.pathname === '/validators') && (
           <div className="fixed top-4 right-4 sm:top-6 sm:right-8 z-50">
             <WalletButton />
           </div>
