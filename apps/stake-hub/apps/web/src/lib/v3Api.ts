@@ -6,6 +6,11 @@ export type V3Overview = {
   validator_count: number
   total_stake_pot: number
   source: string
+  served_from?: 'live' | 'cache'
+  stale?: boolean
+  cachedAt?: number | null
+  blockNumber?: number | null
+  error?: string | null
 }
 
 export type V3Network = {
@@ -34,6 +39,11 @@ export type V3Validator = {
 export type V3ValidatorsResponse = {
   network: string
   validators: V3Validator[]
+  served_from?: 'live' | 'cache'
+  stale?: boolean
+  cachedAt?: number | null
+  blockNumber?: number | null
+  error?: string | null
 }
 
 export type V3Era = {
@@ -119,4 +129,18 @@ export function commissionToPercent(value: string | number | null | undefined) {
   // Backend V3 exposes commission_pct in percentage points (e.g. "1.0").
   // Raw chain per-billion conversion belongs in backend/app/v3.py, not here.
   return Math.max(0, Math.min(100, n))
+}
+
+export type SnapshotLatest = {
+  snapshot: { id: number; taken_at: number; block_number: number; era: number | null; source: string; validator_count: number } | null
+  age_seconds: number | null
+  stale: boolean
+  collector: { last_ok: number | null; last_error: string | null; running: boolean }
+  source: string
+}
+export type SnapshotChange = { id: number; detected_at: number; snapshot_id: number; address: string; field: string; old_value: string | null; new_value: string | null }
+
+export const v3SnapshotApi = {
+  latest: (signal?: AbortSignal) => get<SnapshotLatest>('/snapshots/latest', signal),
+  changes: (limit = 20, signal?: AbortSignal) => get<{ changes: SnapshotChange[] }>(`/snapshots/changes?limit=${limit}`, signal),
 }

@@ -2,7 +2,8 @@ import TxToast from '../components/TxToast'
 import { useEffect, useMemo, useState } from 'react'
 import { useWallet } from '../lib/walletContext'
 import { v3Api } from '../lib/v3Api'
-import { decimalToPlanck, planckToPot, submitStaking, estimateStakeFee, getBondingDuration, type StakingUpdate } from '../lib/staking'
+import { decimalToPlanck, planckToPot, submitStaking, estimateStakeFee, getBondingDuration, readOnChainBondedPlanck, readOnChainNominations, type StakingUpdate } from '../lib/staking'
+import { verifyBondDelta, verifyNominationSet, type BondCheck } from '../lib/nominationVerify'
 
 type Validator = { address: string; name: string; commission: number | null; total_stake_pot: number | null; status?: string }
 type Overview = { total_staked_pot: number; est_base_apy_pct: number; apy_is_model_estimate?: boolean }
@@ -126,13 +127,22 @@ export default function Stake() {
     return () => { cancelled = true; clearTimeout(t) }
   }, [account, amount, validAmount, selectedValidators, chainData.hasLedger])
 
+  const [verification, setVerification] = useState<{ bond: BondCheck; nominations: ReturnType<typeof verifyNominationSet>; checkedAt: number } | null>(null)
   const submit = async () => {
     if (!account || selectedValidators.length === 0 || !validAmount || busy) return
     setBusy(true)
     setUpdate({ status: 'Preparing staking transaction…' })
     try {
-      await submitStaking(account, amount, selectedValidators.map(v => v.address), chainData.hasLedger, setUpdate)
+      const ids = selectedValidators.map(v => v.address)
+      const beforeBond = await readOnChainBondedPlanck(account.address)
+      await submitStaking(account, amount, ids, chainData.hasLedger, setUpdate)
       await refreshChainData()
+      // Post-finalization: read back bond and nominations from chain, compare with what was requested.
+      const afterBond = await readOnChainBondedPlanck(account.address)
+      const bond = verifyBondDelta(beforeBond, afterBond, decimalToPlanck(amount))
+      const nominations = verifyNominationSet(ids, await readOnChainNominations(account.address))
+      setVerification({ bond, nominations, checkedAt: Date.now() })
+      setUpdate({ status: bond.ok && nominations.ok ? 'Verified on chain: bond and nominations match' : 'Chain check: mismatch, see details' })
     } catch (error) {
       setUpdate({ status: 'Staking failed', error: error instanceof Error ? error.message : String(error) })
     } finally {
@@ -140,6 +150,15 @@ export default function Stake() {
     }
   }
 
+  const verifyPanel = verification ? (
+    <div className={`mt-4 rounded-lg border p-4 text-xs font-mono space-y-1.5 ${verification.bond.ok && verification.nominations.ok ? 'border-[#10b981]/40 bg-[#10b981]/10 text-[#d1fae5]' : 'border-amber-500/40 bg-amber-950/30 text-amber-200'}`}>
+      <div className="font-semibold">{verification.bond.ok && verification.nominations.ok ? 'Verified on chain' : 'Chain mismatch after finalization'} · checked {new Date(verification.checkedAt).toLocaleTimeString('en-GB')}</div>
+      <div>Bond change: {planckToPot(verification.bond.deltaPlanck)} tPOT (requested {planckToPot(verification.bond.expectedPlanck)} tPOT)</div>
+      <div>Nominations: {verification.nominations.onChainCount} on chain / {verification.nominations.requestedCount} requested</div>
+      {verification.nominations.missing.length > 0 && <div>Missing on chain: {verification.nominations.missing.join(', ')}</div>}
+      {verification.nominations.extra.length > 0 && <div>Extra on chain: {verification.nominations.extra.join(', ')}</div>}
+    </div>
+  ) : null
   const avgCommission = (() => {
     const values = validators.map(v => v.commission).filter((c): c is number => c !== null)
     return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
@@ -228,6 +247,7 @@ export default function Stake() {
           {amountInvalid && <div className="unstake-warning">Enter a valid amount no greater than available balance.</div>}
           <button type="button" className="unstake-primary" disabled={!account || selectedValidators.length === 0 || !validAmount || busy} onClick={() => { void submit() }}>{busy ? 'Waiting for wallet…' : 'Review stake'} <span>→</span></button>
           {update && <div className="unstake-tx-result"><strong>{update.status}</strong>{update.error && <span>{update.error}</span>}{update.txHash && <a href={`${EXPLORER}/#/extrinsic/${update.txHash}`} target="_blank" rel="noreferrer">{update.txHash.slice(0, 12)}…{update.txHash.slice(-8)} · View transaction ↗</a>}</div>}
+          {verifyPanel}
           <div className="unstake-noncustodial"><span className="material-symbols-outlined" translate="no">verified_user</span><p><strong>Non-custodial staking</strong>Your wallet approves and controls this transaction. Transaction values are verified against live chain data.</p></div>
         </aside>
       </div>

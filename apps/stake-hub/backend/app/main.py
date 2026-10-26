@@ -35,6 +35,14 @@ app.include_router(security_router)
 app.include_router(slashing_router)
 app.include_router(v3_router)
 
+from app.v3_snapshots import router as v3_snapshots_router, start_collector as _v3_start_collector
+app.include_router(v3_snapshots_router)
+
+
+@app.on_event("startup")
+def _start_v3_snapshots():
+    _v3_start_collector()
+
 
 def _active_validator_set():
     """Return the live Session validator set, or None if it cannot be verified."""

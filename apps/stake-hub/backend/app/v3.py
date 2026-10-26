@@ -79,6 +79,34 @@ def _int(value, default=0):
         return default
 
 
+def normalize_exposure(exposure):
+    """Return (total, own, nominator_count) from Overview or legacy storage."""
+    if not isinstance(exposure, dict):
+        return 0, 0, 0
+    total = _int(exposure.get("total"), 0)
+    own = _int(exposure.get("own"), 0)
+    nominators = exposure.get("nominator_count")
+    if nominators is None:
+        nominators = len(exposure.get("others") or [])
+    return total, own, _int(nominators, 0)
+
+
+def normalize_reward_points(points_data):
+    """Return validator reward points from list or mapping storage shapes."""
+    if not isinstance(points_data, dict):
+        return {}
+    individual = points_data.get("individual")
+    if isinstance(individual, dict):
+        return {str(address): _int(value, 0) for address, value in individual.items()}
+    if isinstance(individual, list):
+        result = {}
+        for item in individual:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                result[str(item[0])] = _int(item[1], 0)
+        return result
+    return {}
+
+
 def _live_snapshot():
     global _SNAPSHOT_CACHE, _SNAPSHOT_CACHE_AT
     cached = _cached_snapshot()
@@ -103,16 +131,15 @@ def _live_snapshot():
     raise RuntimeError("Unable to read live V3 snapshot")
 
 
-@router.get("/overview")
-def overview():
+def _overview_uncached():
     ss, health, chain, header, block_number, block_hash, validators, era = _live_snapshot()
     total = 0
     if era is not None:
         with _SS_LOCK:
             for address in validators:
                 try:
-                    exposure = ss.query("Staking", "ErasStakers", [era, address]).value or {}
-                    total += _int(exposure.get("total"), 0)
+                    exposure = ss.query("Staking", "ErasStakersOverview", [era, address]).value or {}
+                    total += normalize_exposure(exposure)[0]
                 except Exception:
                     continue
     return {
@@ -127,23 +154,11 @@ def overview():
     }
 
 
-_VALIDATORS_CACHE = None
-_VALIDATORS_CACHE_AT = 0.0
-_VALIDATORS_TTL = 60.0
-
-
-@router.get("/validators")
-def validators():
-    global _VALIDATORS_CACHE, _VALIDATORS_CACHE_AT
-    if _VALIDATORS_CACHE is not None and time.monotonic() - _VALIDATORS_CACHE_AT < _VALIDATORS_TTL:
-        return _VALIDATORS_CACHE
-    result_payload = _validators_uncached()
-    _VALIDATORS_CACHE, _VALIDATORS_CACHE_AT = result_payload, time.monotonic()
-    return result_payload
+# validators endpoint: see _last_good_response below
 
 
 def _validators_uncached():
-    ss, _, chain, _, _, _, addresses, era = _live_snapshot()
+    ss, _, chain, _, block_number, _, addresses, era = _live_snapshot()
     result = []
     with _SS_LOCK:
         for address in addresses:
@@ -160,16 +175,14 @@ def _validators_uncached():
                 errors.append(f"commission: {exc}")
             if era is not None:
                 try:
-                    exposure = ss.query("Staking", "ErasStakers", [era, address]).value or {}
-                    total = _int(exposure.get("total"), 0)
-                    own = _int(exposure.get("own"), 0)
-                    nominator_count = len(exposure.get("others") or [])
+                    exposure = ss.query("Staking", "ErasStakersOverview", [era, address]).value or {}
+                    total, own, nominator_count = normalize_exposure(exposure)
                 except Exception as exc:
                     errors.append(f"exposure: {exc}")
                 try:
                     points_data = ss.query("Staking", "ErasRewardPoints", [era]).value or {}
-                    individual = points_data.get("individual", {}) if isinstance(points_data, dict) else {}
-                    points = _int(individual.get(address), 0)
+                    individual = normalize_reward_points(points_data)
+                    points = individual.get(address, 0)
                 except Exception as exc:
                     errors.append(f"points: {exc}")
             else:
@@ -186,7 +199,7 @@ def _validators_uncached():
                 "points": points,
                 "data_errors": errors,
             })
-    return {"network": chain or NETWORK, "validators": result}
+    return {"network": chain or NETWORK, "validators": result, "block_number": block_number}
 
 
 @router.get("/eras/latest")
@@ -238,3 +251,96 @@ def network_stats():
     }
     _NETWORK_CACHE, _NETWORK_CACHE_AT = result, time.monotonic()
     return result
+
+
+# ---------------------------------------------------------------------------
+# Last-good responses for /validators and /overview.
+# - Each read runs in a worker with a hard timeout (V3_RPC_TIMEOUT seconds).
+# - Concurrent callers share one in-flight RPC read (no duplicate RPC storms).
+# - On success the payload is stored with cachedAt + blockNumber.
+# - On timeout/error, the last good payload is returned with stale=true.
+#   It is never presented as live (served_from="cache").
+# - With no cached payload, the endpoint answers 503 instead of inventing data.
+# ---------------------------------------------------------------------------
+import concurrent.futures
+from fastapi import HTTPException
+
+V3_RPC_TIMEOUT = float(os.getenv("V3_RPC_TIMEOUT", "20"))  # cold RPC start measured ~15s
+V3_VALIDATORS_TTL = float(os.getenv("V3_VALIDATORS_TTL", "60"))
+V3_OVERVIEW_TTL = float(os.getenv("V3_OVERVIEW_TTL", "60"))
+_RPC_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="v3-rpc")
+_INFLIGHT = {}
+_INFLIGHT_LOCK = threading.Lock()
+_LAST_GOOD = {}  # key -> {"mono", "cached_at", "block_number", "payload"}
+
+
+def _run_deduped(key, fn):
+    """Run fn in a worker; concurrent callers with the same key share one future."""
+    with _INFLIGHT_LOCK:
+        fut = _INFLIGHT.get(key)
+        if fut is None or fut.done():
+            fut = _RPC_POOL.submit(fn)
+            _INFLIGHT[key] = fut
+    return fut.result(timeout=V3_RPC_TIMEOUT)
+
+
+def _respond(key, fn, ttl):
+    entry = _LAST_GOOD.get(key)
+    if entry is not None and time.monotonic() - entry["mono"] < ttl:
+        return _live_body(entry)  # fetched from RPC within TTL; cachedAt = fetch time
+    try:
+        payload = _run_deduped(key, fn)
+    except Exception as exc:  # timeout, RPC error, decode error
+        if isinstance(exc, concurrent.futures.TimeoutError):
+            error = f"RPC timeout after {V3_RPC_TIMEOUT:g}s"
+        else:
+            error = f"{type(exc).__name__}: {exc}"[:200]
+        if entry is not None:
+            return _cached_body(entry, stale=True, error=error)
+        raise HTTPException(status_code=503, detail={"error": error, "stale": True, "served_from": None})
+    entry = {
+        "mono": time.monotonic(),
+        "cached_at": int(time.time()),
+        "block_number": _block_of(payload),
+        "payload": payload,
+    }
+    _LAST_GOOD[key] = entry
+    return _live_body(entry)
+
+
+def _block_of(payload):
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("block_number") is not None:
+        return payload.get("block_number")
+    return (payload.get("latest_block") or {}).get("block_number")
+
+
+def _live_body(entry):
+    body = dict(entry["payload"])
+    body.update({"served_from": "live", "stale": False, "cachedAt": entry["cached_at"],
+                 "blockNumber": entry["block_number"], "error": None})
+    return body
+
+
+def _cached_body(entry, stale, error):
+    body = dict(entry["payload"])
+    body.update({"served_from": "cache", "stale": stale, "cachedAt": entry["cached_at"],
+                 "blockNumber": entry["block_number"], "error": error})
+    return body
+
+
+@router.get("/validators")
+def validators():
+    return _respond("validators", lambda: _validators_uncached(), V3_VALIDATORS_TTL)
+
+
+@router.get("/overview")
+def overview():
+    return _respond("overview", lambda: _overview_uncached(), V3_OVERVIEW_TTL)
+
+
+@router.get("/infra/rpc")
+def infra_rpc(window: str = "latest"):
+    from app.rpc_health import report
+    return report(window if window in {"latest", "1h", "24h", "7d"} else "latest")

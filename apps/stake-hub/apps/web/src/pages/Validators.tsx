@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useRef,  useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { commissionToPercent, toNumber, v3Api, type V3Overview } from '../lib/v3Api'
+import { commissionToPercent, toNumber, v3Api, v3SnapshotApi, type SnapshotChange, type SnapshotLatest, type V3Overview, type V3Validator } from '../lib/v3Api'
+import { readValidatorCache, writeValidatorCache } from '../lib/validatorCache'
 import { useWallet } from '../lib/walletContext'
-import { estimateNominationFee, submitNominationChange, type StakingUpdate } from '../lib/staking'
+import { estimateNominationFee, readOnChainNominations, submitNominationChange, type StakingUpdate } from '../lib/staking'
+import { SectionBoundary } from '../components/SectionBoundary'
+import { verifyNominationSet, type NominationCheck } from '../lib/nominationVerify'
 import { ErrorBox, ReviewNote, WalletUnavailable } from '../components/StakingTabs'
 import TxToast from '../components/TxToast'
 import {
@@ -38,6 +41,23 @@ function riskLabel(tier: string) {
   return 'Commission ≥50%'
 }
 
+const VALIDATORS_CACHE_KEY = 'portaldot.v3.validators.cache'
+const CHANGES_PER_PAGE = 6
+
+// Display-only formatting for snapshot change values. Raw values stay unchanged in the API.
+function formatChangeValue(field: string, value: string | null): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (field === 'total_pot' || field === 'own_pot') {
+    const n = Number(value)
+    if (Number.isFinite(n)) return `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })} tPOT`
+  }
+  if (field === 'commission_pct') {
+    const n = Number(value)
+    if (Number.isFinite(n)) return `${n.toFixed(2)}%`
+  }
+  return value
+}
+
 export default function Validators() {
   const { account, chainData, refreshChainData } = useWallet()
   const [validators, setValidators] = useState<ValidatorRow[]>([])
@@ -51,45 +71,104 @@ export default function Validators() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(false)
+  const [cachedAt, setCachedAt] = useState<number | null>(null)
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null)
+  const [blockNumber, setBlockNumber] = useState<number | null>(null)
+  const [validatorState, setValidatorState] = useState<'live' | 'stale' | 'error' | 'loading'>('loading')
+  const validatorStateRef = useRef<'live' | 'stale' | 'error' | 'loading'>('loading')
+  useEffect(() => { validatorStateRef.current = validatorState }, [validatorState])
+  const [overviewState, setOverviewState] = useState<'live' | 'stale' | 'error' | 'loading'>('loading')
   const [busy, setBusy] = useState(false)
   const [update, setUpdate] = useState<StakingUpdate | null>(null)
 
+  const toRows = (list: V3Validator[]): ValidatorRow[] => list.map(v => {
+    const commission = commissionToPercent(v.commission_pct)
+    const [tier, risk_score] = classify(commission)
+    return {
+      address: v.address,
+      name: v.nickname || shortAddress(v.address),
+      commission,
+      total_stake_pot: v.total_pot === null ? null : toNumber(v.total_pot),
+      own_pot: v.own_pot === null ? null : toNumber(v.own_pot),
+      nominators: v.nominator_count,
+      points: v.points,
+      tier,
+      risk_score,
+    }
+  })
+
   const load = async (manual = false) => {
     manual ? setRefreshing(true) : setLoading(true)
-    try {
-      const [overviewData, validatorData] = await Promise.all([
-        v3Api.overview(),
-        v3Api.validators(),
-      ])
-      setOverview(overviewData)
-      setValidators(validatorData.validators.map(v => {
-        const commission = commissionToPercent(v.commission_pct)
-        const [tier, risk_score] = classify(commission)
-        return {
-          address: v.address,
-          name: v.nickname || shortAddress(v.address),
-          commission,
-          total_stake_pot: v.total_pot === null ? null : toNumber(v.total_pot),
-          own_pot: v.own_pot === null ? null : toNumber(v.own_pot),
-          nominators: v.nominator_count,
-          points: v.points,
-          tier,
-          risk_score,
-        }
-      }))
-      setError(false)
-    } catch {
-      setError(true)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    // Overview and validators are independent: each one's failure is handled on its own.
+    const [overviewResult, validatorResult] = await Promise.allSettled([v3Api.overview(), v3Api.validators()])
+
+    if (overviewResult.status === 'fulfilled') {
+      setOverview(overviewResult.value)
+      setOverviewState(overviewResult.value.stale ? 'stale' : 'live')
+    } else {
+      setOverviewState('error')
     }
+
+    if (validatorResult.status === 'fulfilled' && validatorResult.value.validators?.length) {
+      const body = validatorResult.value
+      const rows = toRows(body.validators)
+      setValidators(rows)
+      setValidatorState(body.stale ? 'stale' : 'live')
+      setBlockNumber(body.blockNumber ?? null)
+      setCachedAt(body.cachedAt ?? Date.now() / 1000)
+      setLastFetchedAt(new Date())
+      setError(false)
+      // Browser cache: only overwrite with data we just validated as live from the server.
+      if (body.stale !== true) {
+        writeValidatorCache({ at: Date.now(), blockNumber: body.blockNumber ?? null, overview: overviewResult.status === 'fulfilled' ? overviewResult.value : null, validators: body.validators })
+      }
+    } else {
+      // Live path failed. Fall back to the browser cache only if it passes validation.
+      const cached = readValidatorCache()
+      if (cached) {
+        setValidators(toRows(cached.validators as unknown as V3Validator[]))
+        setValidatorState('stale')
+        setBlockNumber(cached.blockNumber)
+        setCachedAt(cached.at / 1000)
+        if (cached.overview && overviewResult.status !== 'fulfilled') setOverview(cached.overview as V3Overview)
+        setError(true)
+      } else {
+        setValidatorState('error')
+        setError(true)
+      }
+    }
+    setLoading(false)
+    setRefreshing(false)
   }
 
   useEffect(() => {
     void load()
-    const timer = window.setInterval(() => { void load() }, 60_000)
-    return () => window.clearInterval(timer)
+    // Normal cadence is 60s. After a failed live load, retry with exponential backoff (5s -> 60s cap).
+    let cancelled = false
+    let delay = 60_000
+    let timeout: number | undefined
+    const tick = async () => {
+      await load()
+      if (cancelled) return
+      delay = validatorStateRef.current === 'live' ? 60_000 : Math.min(Math.max(delay * 2, 5_000), 60_000)
+      timeout = window.setTimeout(tick, delay)
+    }
+    timeout = window.setTimeout(tick, delay)
+    return () => { cancelled = true; window.clearTimeout(timeout) }
+  }, [])
+
+  const [snapshot, setSnapshot] = useState<SnapshotLatest | null>(null)
+  const [changes, setChanges] = useState<SnapshotChange[] | null>(null)
+  const [snapshotError, setSnapshotError] = useState(false)
+  const [changesPage, setChangesPage] = useState(0)
+  useEffect(() => {
+    let alive = true
+    const loadSnapshot = () => Promise.all([v3SnapshotApi.latest(), v3SnapshotApi.changes(200)])
+      .then(([latest, delta]) => { if (!alive) return; setSnapshot(latest); setChanges(delta.changes); setSnapshotError(false) })
+      .catch(() => { if (alive) setSnapshotError(true) })
+    void loadSnapshot()
+    const timer = window.setInterval(() => { void loadSnapshot() }, 60_000)
+    return () => { alive = false; window.clearInterval(timer) }
   }, [])
 
   const filtered = useMemo(
@@ -122,6 +201,7 @@ export default function Validators() {
     }
   }
   const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every(x => b.includes(x))
+  const [verification, setVerification] = useState<(NominationCheck & { checkedAt: number }) | null>(null)
   const submit = async () => {
     if (!account || !selected.length || busy) return
     setBusy(true)
@@ -129,6 +209,11 @@ export default function Validators() {
     try {
       await submitNominationChange(account, selected, setUpdate)
       await refreshChainData()
+      // Post-finalization check: read nominations back from chain and compare with the requested set.
+      const onChain = await readOnChainNominations(account.address)
+      const check = verifyNominationSet(selected, onChain)
+      setVerification({ ...check, checkedAt: Date.now() })
+      setUpdate({ status: check.ok ? 'Verified on chain: nominations match the requested set' : 'Chain mismatch after finalization: see details' })
     } catch (error) {
       setUpdate({ status: 'Validator change failed', error: error instanceof Error ? error.message : String(error) })
     } finally {
@@ -176,7 +261,7 @@ export default function Validators() {
       <div className="mt-4 grid grid-cols-2 gap-3 text-[11px]">
         <div><span className="block text-[#8a94b8]">Total stake</span><strong className="mt-1 block font-mono text-white">{formatPot(row.total_stake_pot)} tPOT</strong></div>
         <div><span className="block text-[#8a94b8]">Own stake</span><strong className="mt-1 block font-mono text-white">{formatPot(row.own_pot)} tPOT</strong></div>
-        <div><span className="block text-[#8a94b8]">Stake share</span><strong className="mt-1 block font-mono text-white">{share.toFixed(1)}%</strong></div>
+        <div><span className="block text-[#8a94b8]">Stake share</span><strong className="mt-1 block font-mono text-white">{Number.isFinite(share) ? share.toFixed(1) : '—'}%</strong></div>
         <div><span className="block text-[#8a94b8]">Commission</span><strong className={`mt-1 block font-mono ${row.commission === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>{row.commission.toFixed(1)}%</strong></div>
         <div><span className="block text-[#8a94b8]">Nominators</span><strong className="mt-1 block font-mono text-white">{row.nominators ?? 'Unavailable'}</strong></div>
         <div><span className="block text-[#8a94b8]">Reward points</span><strong className="mt-1 block font-mono text-white">{row.points?.toLocaleString() ?? 'Unavailable'}</strong><span className="block text-[10px] text-[#8a94b8]/80">Era {overview?.latest_era ?? '—'} · live, rises each block</span></div>
@@ -191,7 +276,7 @@ export default function Validators() {
       <td className="px-4 text-center"><input aria-label={`Select ${row.address} for nomination`} type="checkbox" checked={checked} onChange={() => toggle(row.address)} disabled={!account || (!checked && selected.length >= MAX_VALIDATORS)} className="w-3.5 h-3.5 rounded bg-[#020617] border-[#24305c] text-[#7c4dff] focus:ring-0 cursor-pointer disabled:opacity-30" /></td>
       <td className="px-4 py-2">{validator}</td>
       <td className="px-4 py-2 font-mono text-xs"><span className="text-white font-semibold">{formatPot(row.total_stake_pot)}</span><span className="text-[#8a94b8]"> tPOT</span></td>
-      <td className="px-4 py-2"><div className="flex flex-col gap-1 w-28"><span className="text-xs font-mono text-white">{share.toFixed(1)}%</span><div className="w-full bg-[#070d24] h-1.5 rounded-full overflow-hidden border border-[#24305c]/60"><div className="bg-gradient-to-r from-[#00f2fe] to-[#10b981] h-full rounded-full" style={{ width: `${share}%` }} /></div></div></td>
+      <td className="px-4 py-2"><div className="flex flex-col gap-1 w-28"><span className="text-xs font-mono text-white">{Number.isFinite(share) ? share.toFixed(1) : '—'}%</span><div className="w-full bg-[#070d24] h-1.5 rounded-full overflow-hidden border border-[#24305c]/60"><div className="bg-gradient-to-r from-[#00f2fe] to-[#10b981] h-full rounded-full" style={{ width: `${share}%` }} /></div></div></td>
       <td className="px-4 py-2 font-mono text-xs text-[#cbd5e1]">{formatPot(row.own_pot)} tPOT</td>
       <td className="px-4 py-2"><span className="bg-[#162044] text-[#94a3b8] px-2 py-0.5 rounded text-xs font-mono">{row.nominators ?? '—'}</span></td>
       <td className={`px-4 py-2 font-mono text-xs font-semibold ${row.commission === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>{row.commission.toFixed(1)}%</td>
@@ -205,6 +290,11 @@ export default function Validators() {
       <section className="mt-5 space-y-3 bg-[#070d24] border border-[#24305c] p-3 rounded-[10px]">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex h-8 items-center gap-2 px-2.5 rounded bg-[#0b1231] border border-[#24305c] text-xs font-mono text-[#8a94b8]"><span className={`w-2 h-2 rounded-full ${stale ? 'bg-amber-400' : 'bg-[#10b981] animate-ping'}`} /><span className="text-white font-medium">Updated {updatedAt ? updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—'}</span></div>
+          <span className={`flex h-8 items-center gap-1.5 px-2.5 rounded border font-mono text-xs font-medium ${validatorState === 'live' ? 'border-[#10b981]/40 text-[#10b981] bg-[#10b981]/10' : validatorState === 'stale' ? 'border-amber-500/40 text-amber-300 bg-amber-950/30' : validatorState === 'error' ? 'border-red-500/40 text-red-300 bg-red-950/30' : 'border-[#24305c] text-[#8a94b8] bg-[#0b1231]'}`} title={validatorState === 'stale' ? 'Showing last successful data from the server or this browser cache' : undefined}>
+            {validatorState === 'live' ? 'Live' : validatorState === 'stale' ? 'Stale' : validatorState === 'error' ? 'RPC Error' : 'Loading'}
+            {blockNumber !== null && <span className="text-[#8a94b8] font-normal">· block {blockNumber}</span>}
+            {validatorState === 'stale' && cachedAt && <span className="text-[#8a94b8] font-normal">· cached {new Date(cachedAt * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
+          </span>
           <span className="flex h-8 items-center px-2.5 rounded bg-[#0b1231] border border-[#24305c] text-xs font-mono text-[#8a94b8]">Portaldot V3 · Era {overview?.latest_era ?? '—'}</span>
           <button type="button" onClick={() => { void load(true) }} className="h-8 w-8 rounded bg-[#0b1231] border border-[#24305c] hover:border-[#8a94b8] text-[#8a94b8] hover:text-white flex items-center justify-center transition-all" title="Refresh snapshot"><span className={`material-symbols-outlined text-[16px] ${refreshing ? 'animate-spin' : ''}`} translate="no">refresh</span></button>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -224,21 +314,94 @@ export default function Validators() {
                 <div className="flex items-center justify-between border-t border-[#24305c]/60 pt-2.5 text-xs font-mono"><span className="text-[#8a94b8]">NPoS Active Validator Set ({activeCount} active)</span><span className="hidden lg:inline text-[11px] text-[#8a94b8]">Selection limit: {MAX_VALIDATORS} validators</span></div>
       </section>
 
+
       {stale && <section className="mt-3 bg-amber-950/30 border border-amber-500/40 rounded-[10px] p-3 flex items-center justify-between gap-3 text-xs font-mono"><div className="flex items-center gap-2.5 text-amber-400"><span className="material-symbols-outlined text-[18px]" translate="no">warning</span><span>Data may be outdated · last updated {updatedAt?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></div><button type="button" onClick={() => { void load(true) }} className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300">Force sync</button></section>}
 
       {!account && <div className="mt-4"><WalletUnavailable>Connect a wallet to select validators and manage nominations. Public validator data remains available.</WalletUnavailable></div>}
 
       <section className="mt-4 bg-[#0b1231] border border-[#24305c] rounded-[10px] shadow-xl overflow-hidden relative">
+        {validatorState === 'stale' && <div className="px-4 py-2 text-[11px] font-mono text-amber-300 border-b border-[#24305c] bg-amber-950/20">Showing cached data (not live){cachedAt ? ` from ${new Date(cachedAt * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''} · live refresh failed, retrying automatically</div>}
         {loading ? <div className="p-4 space-y-3">{[0, 1, 2].map(row => <div key={row} className="h-12 rounded bg-[#070d24] animate-pulse border border-[#1c2456]" />)}</div> : error && validators.length === 0 ? <div className="px-6 py-16 text-center"><span className="material-symbols-outlined text-4xl text-amber-300" translate="no">cloud_off</span><h2 className="mt-3 text-lg font-semibold text-white">Validator data is unavailable</h2><p className="mt-2 text-[#8a94b8]">The dashboard will retry automatically.</p><button type="button" onClick={() => { void load(true) }} className="mt-4 rounded border border-[#24305c] px-3 py-2 text-xs font-mono text-white">Retry</button></div> : filtered.length === 0 ? <div className="px-6 py-16 text-center"><h2 className="text-lg font-semibold text-white">No validator snapshot yet</h2><p className="mt-2 text-[#8a94b8]">Run the collector to populate live Portaldot V3 data.</p></div> : view === 'table' ? <><div className="hidden md:block overflow-x-auto custom-scrollbar"><table className="w-full text-left border-collapse min-w-[1280px]"><thead><tr className="h-[42px] bg-[#070d24] text-[#8a94b8] text-xs font-mono uppercase tracking-wider border-b border-[#24305c]"><th className="px-4 w-10 text-center">Nominate</th><th className="px-4 min-w-[190px]">Validator</th><th className="px-4 min-w-[145px]">Total stake</th><th className="px-4 min-w-[135px]">Stake share</th><th className="px-4 min-w-[145px]">Own stake</th><th className="px-4 min-w-[105px]">Nominators</th><th className="px-4 min-w-[105px]">Commission</th><th className="px-4 min-w-[135px] whitespace-nowrap">Reward points<span className="block text-[9px] normal-case tracking-normal text-[#8a94b8]/80">Era {overview?.latest_era ?? '—'} · live, rises each block</span></th><th className="px-4 text-right min-w-[95px]">Actions</th></tr></thead><tbody className="divide-y divide-[#1c2456]">{tableRows()}</tbody></table></div><div className="md:hidden grid gap-3 p-3">{tableRows(true)}</div></> : <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{tableRows(true)}</div>}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-[#24305c] bg-[#070d24] px-4 py-3 text-[11px] font-mono text-[#8a94b8]"><span>{validators.length} validators · {formatPot(totalStake)} tPOT total · {totalStake > 0 ? validators.map(row => ((row.total_stake_pot ?? 0) / totalStake) * 100).sort((a, b) => b - a).map(value => value.toFixed(0)).join('/') : '0/0'} stake concentration</span><span>Portaldot V3 testnet · Block {overview?.latest_block?.block_number ?? '—'}</span></div>
       </section>
 
       <section className="mt-5 bg-[#0b1231] border border-[#24305c] rounded-[10px] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-[19px] font-bold text-white">Manage nominations</h2><p className="mt-1 text-[13px] text-[#8a94b8]">Select up to {MAX_VALIDATORS} validators, then replace the wallet's nomination set after approval.</p></div><div className="flex gap-2"><button type="button" onClick={loadCurrent} disabled={!account || chainData.status !== 'ready'} className="rounded-lg border border-[#4c4ca9] px-3 py-2 text-[12px] font-semibold text-[#d8dced] disabled:opacity-40">Load current</button><button type="button" onClick={() => { void runPreflight() }} disabled={!account || !selected.length || busy} className="rounded-lg bg-gradient-to-r from-[#8953ff] to-[#5c35df] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-35">Preflight (no signing)</button></div></div>
+        {verification && <div className={`mt-4 rounded-lg border p-4 text-xs font-mono space-y-1.5 ${verification.ok ? 'border-[#10b981]/40 bg-[#10b981]/10 text-[#d1fae5]' : 'border-amber-500/40 bg-amber-950/30 text-amber-200'}`}>
+          <div className="font-semibold">{verification.ok ? 'Verified on chain' : 'Chain mismatch after finalization'} · checked {new Date(verification.checkedAt).toLocaleTimeString('en-GB')}</div>
+          <div>Requested: {verification.requestedCount} · On chain: {verification.onChainCount}</div>
+          {verification.missing.length > 0 && <div>Missing on chain: {verification.missing.map(a => shortAddress(a)).join(', ')}</div>}
+          {verification.extra.length > 0 && <div>Extra on chain: {verification.extra.map(a => shortAddress(a)).join(', ')}</div>}
+        </div>}
         {preflight && <div className="mt-4 rounded-lg border border-[#24305c] bg-[#070d24] p-4 text-xs font-mono text-[#cbd5e1] space-y-1.5"><div><span className="text-[#8a94b8]">Current:</span> {preflight.current.length ? preflight.current.map(a => shortAddress(a)).join(', ') : 'none'}</div><div><span className="text-[#8a94b8]">Proposed (replaces whole set):</span> {preflight.proposed.map(a => shortAddress(a)).join(', ')}</div><div><span className="text-[#8a94b8]">Change:</span> {sameSet(preflight.current, preflight.proposed) ? 'No change — same set as current' : 'Set changes'}</div><div><span className="text-[#8a94b8]">Estimated fee:</span> {preflight.fee ? `${preflight.fee} tPOT` : 'Unavailable'}</div><div className="text-[#8a94b8]">Checked {new Date(preflight.checkedAt).toLocaleTimeString('en-GB')} · bonded amount unchanged · signing is done in your wallet only after you press Submit</div>{!sameSet(preflight.current, preflight.proposed) && sameSet(selected, preflight.proposed) && <button type="button" onClick={() => { void submit() }} disabled={!account || busy} className="mt-2 rounded-lg bg-gradient-to-r from-[#8953ff] to-[#5c35df] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-35">{busy ? 'Waiting for wallet…' : 'Submit (wallet signs)'}</button>}{!sameSet(selected, preflight.proposed) && <div className="text-amber-300">Selection changed after preflight — run Preflight again before submitting.</div>}</div>}
         <div className="mt-4 grid gap-3 md:grid-cols-2"><ReviewNote>Selected: <strong className="text-white">{selected.length} / {MAX_VALIDATORS}</strong>. Current nominations: <strong className="text-white">{chainData.nominations.length}</strong>.</ReviewNote><ReviewNote>Nomination changes are signed by the connected wallet and submitted on-chain. No local-only change is shown as complete.</ReviewNote></div>
         {update && <div className="mt-4"><ErrorBox message={`${update.status}${update.error ? ` · ${update.error}` : ''}`} /></div>}
       </section>
+
+      <SectionBoundary name="Snapshot changes"><section className="mt-5 bg-[#0b1231] border border-[#24305c] rounded-[10px] p-5 text-xs font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[14px] font-semibold text-white">Snapshot changes</h2>
+          <span className="rounded border border-[#24305c] bg-[#070d24] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#8a94b8]">Stored · not live</span>
+        </div>
+        {snapshotError && <p className="mt-2 text-amber-300">Snapshot data unavailable right now. Showing last loaded state.</p>}
+        {snapshot?.snapshot ? (
+          <div className="mt-3 grid gap-2 text-[#cbd5e1] sm:grid-cols-[1fr_auto] sm:items-center">
+            <span className="text-[12px]">
+              <span className="text-[#8a94b8]">Snapshot taken </span>{Number.isFinite(snapshot.snapshot.taken_at) ? new Date(snapshot.snapshot.taken_at * 1000).toLocaleString('en-GB') : '—'}
+              <span className="text-[#8a94b8]"> · block </span>{snapshot.snapshot.block_number}
+              <span className="text-[#8a94b8]"> · era </span>{snapshot.snapshot.era ?? '—'}
+            </span>
+            <span className={`justify-self-start sm:justify-self-end inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${snapshot.stale ? 'border-amber-500/40 bg-amber-950/30 text-amber-300' : 'border-[#10b981]/40 bg-[#10b981]/10 text-[#10b981]'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${snapshot.stale ? 'bg-amber-400' : 'bg-[#10b981]'}`} />
+              {snapshot.stale ? 'Stale' : 'Fresh'} · age {snapshot.age_seconds === null ? '—' : `${Math.floor(snapshot.age_seconds / 60)} min`}
+            </span>
+            {snapshot.collector.last_error && <span className="text-amber-300 sm:col-span-2">Collector last error: {snapshot.collector.last_error}</span>}
+          </div>
+        ) : !snapshotError && snapshot ? <p className="mt-2 text-[#8a94b8]">No stored snapshot yet.</p> : null}
+        <div className="mt-3 border-t border-[#24305c]/60 pt-3">
+          {changes === null ? <p className="text-[#8a94b8]">Loading changes…</p> : (() => {
+            // Points rise every block (runtime activity), so they are kept out of the list.
+            const material = changes.filter(c => c.field !== 'points')
+            const pointsCount = changes.length - material.length
+            const fieldLabel: Record<string, string> = { commission_pct: 'commission', total_pot: 'total stake', own_pot: 'own stake', nominator_count: 'nominators', membership: 'membership' }
+            const pages = Math.max(1, Math.ceil(material.length / CHANGES_PER_PAGE))
+            const page = Math.min(changesPage, pages - 1)
+            const slice = material.slice(page * CHANGES_PER_PAGE, page * CHANGES_PER_PAGE + CHANGES_PER_PAGE)
+            return <>
+              {material.length === 0
+                ? <p className="text-[#8a94b8]">No commission, stake, nominator, or membership changes since the last snapshot.</p>
+                : <>
+                    <ul className="space-y-2">
+                      {slice.map(c => (
+                        <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#1c2456] bg-[#070d24] px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded bg-[#1e2a5e] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#c4b5fd]">{fieldLabel[c.field] ?? c.field}</span>
+                            <span className="text-[#e2e8f0]">{shortAddress(c.address)}</span>
+                          </div>
+                          <div className="flex min-w-0 flex-col items-end gap-0.5 text-[12px]">
+                            <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+                              <span className="break-all text-[#8a94b8]">{formatChangeValue(c.field, c.old_value)}</span>
+                              <span className="text-[#8a94b8]">→</span>
+                              <span className="break-all font-semibold text-white">{formatChangeValue(c.field, c.new_value)}</span>
+                            </div>
+                            <span className="text-[10px] text-[#8a94b8]/80">{Number.isFinite(c.detected_at) ? new Date(c.detected_at * 1000).toLocaleString('en-GB') : '—'}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {material.length > 0 && (
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#24305c]/60 pt-3 text-[#8a94b8]">
+                        <button type="button" disabled={page === 0} onClick={() => setChangesPage(page - 1)} className="rounded-md border border-[#3b4a8a] bg-[#0b1231] px-3 py-1.5 text-[#e2e8f0] hover:border-[#8a94b8] disabled:cursor-not-allowed disabled:border-[#24305c] disabled:text-[#4b5578]">← Newer</button>
+                        <span className="text-[11px]">Page <span className="text-white">{page + 1}</span> of <span className="text-white">{pages}</span> · {material.length} change{material.length === 1 ? '' : 's'}</span>
+                        <button type="button" disabled={page >= pages - 1} onClick={() => setChangesPage(page + 1)} className="rounded-md border border-[#3b4a8a] bg-[#0b1231] px-3 py-1.5 text-[#e2e8f0] hover:border-[#8a94b8] disabled:cursor-not-allowed disabled:border-[#24305c] disabled:text-[#4b5578]">Older →</button>
+                      </div>
+                    )}
+                  </>}
+              {pointsCount > 0 && <p className="mt-2 text-[10px] text-[#8a94b8]/80">{pointsCount} reward-points update(s) hidden: points rise every block and are activity, not a risk signal.</p>}
+            </>
+          })()}
+        </div>
+      </section></SectionBoundary>
     </div>
 
     {details && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Validator details" onMouseDown={event => { if (event.target === event.currentTarget) setDetails(null) }}><div className="w-full max-w-lg bg-[#0b1231] border border-[#3b4b88] rounded-xl shadow-2xl p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-mono uppercase tracking-[.14em] text-[#8a94b8]">Validator details</p><h2 className="mt-1 text-lg font-bold text-white font-mono">{shortAddress(details.address)}</h2></div><button type="button" onClick={() => setDetails(null)} className="text-[#8a94b8] hover:text-white" aria-label="Close"><span className="material-symbols-outlined" translate="no">close</span></button></div><div className="mt-5 grid grid-cols-2 gap-3 text-xs">{[['Total stake', `${formatPot(details.total_stake_pot)} tPOT`], ['Own stake', `${formatPot(details.own_pot)} tPOT`], ['Stake share', `${totalStake ? ((details.total_stake_pot ?? 0) / totalStake * 100).toFixed(1) : '0'}%`], ['Nominators', details.nominators ?? 'Unavailable'], ['Commission', `${details.commission.toFixed(1)}%`], ['Reward points', details.points?.toLocaleString() ?? 'Unavailable']].map(([label, value]) => <div key={label} className="rounded-lg border border-[#24305c] bg-[#070d24] p-3"><span className="text-[#8a94b8]">{label}</span><strong className="mt-1 block font-mono text-white">{value}</strong></div>)}</div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => { void copyAddress(details.address) }} className="rounded border border-[#24305c] px-3 py-2 text-xs font-mono text-[#8a94b8] hover:text-white">Copy address</button><Link to="/stake" onClick={() => setDetails(null)} className="rounded bg-gradient-to-r from-[#8953ff] to-[#5c35df] px-4 py-2 text-xs font-bold text-white">Continue to Stake</Link></div></div></div>}

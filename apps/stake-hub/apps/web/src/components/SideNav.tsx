@@ -49,6 +49,7 @@ const groups: { title: string | null; items: NavItem[] }[] = [
     title: 'Validators',
     items: [
       { to: '/validators', label: 'Validators', icon: 'verified_user' },
+      { to: '/infra', label: 'RPC Analyst', icon: 'monitor_heart' },
     ],
   },
   {

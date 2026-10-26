@@ -10,6 +10,7 @@ import Portfolio from './pages/Portfolio'
 import Alerts from './pages/Alerts'
 import AskDot from './pages/AskDot'
 import Validators from './pages/Validators'
+import Infra from './pages/Infra'
 import Overview from './pages/Overview'
 import Payouts from './pages/Payouts'
 
@@ -45,6 +46,7 @@ export default function App() {
     <Route path="/payouts" element={<Payouts />} />
     <Route path="/portfolio" element={<Portfolio />} />
     <Route path="/validators" element={<Validators />} />
+    <Route path="/infra" element={<Infra />} />
     <Route path="/alerts" element={<Alerts />} />
     <Route path="/ai" element={<AskDot />} />
   </Routes>

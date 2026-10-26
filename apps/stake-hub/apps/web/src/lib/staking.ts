@@ -191,6 +191,28 @@ export async function estimateStakeFee(address: string, amountText: string, vali
 }
 
 // Read-only fee estimate for nominate-only change (no bond/bondExtra, amount unchanged).
+// Read-only: returns the validator addresses currently nominated on chain for an account (empty if none).
+// Used after finalization to verify the nomination set actually changed. Never signs or sends.
+// Read-only: returns the ledger total (planck, string) for an account, or "0" when no ledger exists.
+export async function readOnChainBondedPlanck(address: string): Promise<string> {
+  const api = await ApiPromise.create({ provider: new WsProvider(PORTALDOT_WS) })
+  try {
+    const option: any = await (api.query as any).staking.ledger(address)
+    if (!option || option.isNone) return '0'
+    return option.unwrap().total.toString()
+  } finally { await api.disconnect() }
+}
+
+export async function readOnChainNominations(address: string): Promise<string[]> {
+  const api = await ApiPromise.create({ provider: new WsProvider(PORTALDOT_WS) })
+  try {
+    const option: any = await (api.query as any).staking.nominators(address)
+    if (!option || option.isNone) return []
+    const targets = option.unwrap().targets
+    return targets.map((t: any) => t.toString())
+  } finally { await api.disconnect() }
+}
+
 export async function estimateNominationFee(address: string, validators: string[]): Promise<string | null> {
   if (!address || !validators.length) return null
   const api = await ApiPromise.create({ provider: new WsProvider(PORTALDOT_WS) })
