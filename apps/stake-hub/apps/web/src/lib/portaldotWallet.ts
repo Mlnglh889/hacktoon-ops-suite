@@ -53,7 +53,7 @@ export const EVM_CHAIN_ID = '0x190f1ca9'
 export const EVM_CHAIN_PARAMS = {
   chainId: EVM_CHAIN_ID,
   chainName: PORTALDOT_EXTENSION_NETWORK,
-  nativeCurrency: { name: 'POT', symbol: 'POT', decimals: 14 },
+  nativeCurrency: { name: 'tPOT', symbol: 'tPOT', decimals: 14 },
   rpcUrls: ['https://test-evm-rpc-v3.portaldot.dev'],
   blockExplorerUrls: ['https://node-console.portaldot.dev'],
 }

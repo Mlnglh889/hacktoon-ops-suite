@@ -27,12 +27,21 @@ Testnet only. No mainnet data is mixed into this dashboard.
 | SQLite snapshot store | Working |
 | Read-only API (`/api/v1/...`) | Working, see list below |
 | Validator health dashboard (`/`) | Working, served by FastAPI |
-| Backend unit tests | 17 passed |
+| Backend unit tests | 87 passed (`.venv/bin/python -m pytest` from the repo root) |
+| Stake Hub web app (`apps/stake-hub/apps/web`) | Working: stake, unstake, nominate, validator health, RPC Analyst, alerts |
+| Stake Hub API (`apps/stake-hub/backend/app`) | Working, served by FastAPI |
 | OpsRegistry heartbeat contract | **Deployed and heartbeat confirmed** on Portaldot V3 EVM (chain 420420777): `0x132748201FbCB051CA6D73d26f27540a214d1336`, deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, heartbeat tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` |
 
-## Related work: Stake Hub
+## Stake Hub
 
-Staking actions on the same testnet were verified on-chain with a separate project, `portaldot-stake-hub`:
+The user-signed staking app lives in this repo under `apps/stake-hub`:
+
+- `apps/stake-hub/apps/web` — React app (Vite + Tailwind). Stake, unstake, nominate, validator health, RPC Analyst, alerts. Every action shows a TxToast with the extrinsic hash and explorer link.
+- `apps/stake-hub/backend/app` — FastAPI service. Short-cached reads of `/network` and `/validators`, plus RPC health, incident timeline and payout history.
+
+The browser builds each extrinsic and the user's own wallet extension signs it. The backend never holds a key.
+
+Staking actions on the same testnet were verified on-chain:
 
 - Stake 1 tPOT, unstake 1 tPOT, nominate 2 validators.
 - Tx hashes and blocks: [`data/testnet-evidence.md`](data/testnet-evidence.md).
@@ -60,7 +69,7 @@ Layers:
 - **Storage** (`backend/schema.sql`): SQLite, local-first.
 - **API** (`backend/api.py`): FastAPI, read-only.
 - **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
-- **Stake Hub** (`apps/web`, `backend/app`): React app for stake, unstake and nominate. Each action shows a TxToast with the extrinsic hash and explorer link. Backend caches `/network` and `/validators` for 60 s.
+- **Stake Hub** (`apps/stake-hub/apps/web`, `apps/stake-hub/backend/app`): React app for stake, unstake and nominate, plus validator health, RPC Analyst and alerts. Each action shows a TxToast with the extrinsic hash and explorer link. Backend caches `/network` and `/validators` for 60 s.
 - **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): contract deployed to Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167, status 1). Heartbeat confirmed: tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` (block 159265, status 1, `heartbeatCount` = 1). Evidence: `data/deployment-evidence.json`.
 
 ## Run locally
@@ -77,7 +86,20 @@ uvicorn backend.api:app --reload        # dashboard at http://127.0.0.1:8000
 Run tests:
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest
+```
+
+This covers both suites (`tests/` and `apps/stake-hub/backend/tests/`) via `pytest.ini`.
+
+Run the Stake Hub web app and API:
+
+```bash
+cd apps/stake-hub/apps/web
+npm install
+npm run dev                    # Vite dev server
+
+cd ../../backend
+python -m uvicorn app.main:app --reload
 ```
 
 ## API

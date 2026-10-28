@@ -29,19 +29,23 @@ from app.staking import router as staking_router
 from app.security import router as security_router
 from app.slashing import router as slashing_router
 from app.v3 import router as v3_router
+from app.payouts import router as payouts_router
 
 app.include_router(staking_router)
 app.include_router(security_router)
 app.include_router(slashing_router)
 app.include_router(v3_router)
+app.include_router(payouts_router)
 
 from app.v3_snapshots import router as v3_snapshots_router, start_collector as _v3_start_collector
+from app.telegram_alerts import start_worker as _start_telegram_alert_worker
 app.include_router(v3_snapshots_router)
 
 
 @app.on_event("startup")
 def _start_v3_snapshots():
     _v3_start_collector()
+    _start_telegram_alert_worker()
 
 
 def _active_validator_set():
@@ -134,24 +138,43 @@ async def validators():
     return {"validators": out}
 
 
-# ---------- Dot AI assistant (Gemini-grounded) ----------
+# ---------- Dot AI assistant (app-aware, provider-agnostic) ----------
 from fastapi import Body
-from app.ai_dot import _gather_context, _ask_gemini
+from app.ai_dot import answer as _ai_answer, health as _ai_health
+
+
+@app.get("/api/v1/ai/health")
+def dot_health():
+    """Provider/model in use plus context size. Never returns the API key."""
+    return _ai_health()
+
 
 @app.post("/api/v1/ai/chat")
 def dot_chat(payload: dict = Body(...)):
     message = (payload.get("message") or "").strip()
+    address = (payload.get("address") or "").strip() or None
+    if address and (len(address) < 32 or len(address) > 64):
+        address = None
     if not message:
-        return {"reply": "Ask me anything about Portaldot staking 🙂"}
-    context = _gather_context()
-    reply = None
-    try:
-        reply = _ask_gemini(message, context)
-    except Exception:
-        reply = None
-    if not reply:
-        reply = ("I could not reach my brain service just now — but the Dashboard "
-                 "below still shows live numbers. Try me again in a moment.")
-    return {"reply": reply}
+        return {"reply": "Ask me anything about this dashboard or Portaldot staking 🙂", "ok": False}
+    result = _ai_answer(message, address)
+    if not result["ok"]:
+        # Honest failure, and keep the grounding visible so the operator can see what
+        # the model would have received.
+        return {
+            "reply": ("The AI model is unreachable right now, so I will not guess. "
+                      "Live chain data is still available on Overview, Validators and RPC Analyst."),
+            "ok": False,
+            "model": None,
+            "provider": result["provider"],
+            "error": result["error"],
+            "elapsed_s": result["elapsed_s"],
+            "context": result["context"],
+        }
+    return {
+        "reply": result["reply"], "ok": True, "model": result["model"],
+        "provider": result["provider"], "error": None,
+        "elapsed_s": result["elapsed_s"], "context": result["context"],
+    }
 
 app.include_router(charts_router)

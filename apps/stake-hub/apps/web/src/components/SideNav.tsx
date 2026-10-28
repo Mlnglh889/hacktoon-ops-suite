@@ -16,7 +16,7 @@ const TESTNET_CHAIN_ID = '0x190f1ca9'
 const TESTNET_PARAMS = {
   chainId: TESTNET_CHAIN_ID,
   chainName: 'PortaldotV3 Testnet',
-  nativeCurrency: { name: 'POT', symbol: 'POT', decimals: 14 },
+  nativeCurrency: { name: 'tPOT', symbol: 'tPOT', decimals: 14 },
   rpcUrls: ['https://test-evm-rpc-v3.portaldot.dev'],
   blockExplorerUrls: ['https://node-console.portaldot.dev'],
 }
@@ -42,7 +42,7 @@ const groups: { title: string | null; items: NavItem[] }[] = [
     items: [
       { to: '/stake', label: 'Stake', icon: 'savings' },
       { to: '/unstake', label: 'Unstake', icon: 'undo' },
-      { to: '/payouts', label: 'Payouts', icon: 'payments' },
+      { to: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet' },
     ],
   },
   {
@@ -53,14 +53,11 @@ const groups: { title: string | null; items: NavItem[] }[] = [
     ],
   },
   {
-    title: 'Portfolio',
-    items: [
-      { to: '/portfolio', label: 'Portfolio', icon: 'account_balance_wallet' },
-    ],
-  },
-  {
     title: 'Support',
-    items: [{ to: '/ai', label: 'Ask AI', icon: 'auto_awesome' }],
+    items: [
+      { to: '/alerts', label: 'Alerts', icon: 'notifications' },
+      { to: '/ai', label: 'Ask AI', icon: 'auto_awesome' },
+    ],
   },
 ]
 

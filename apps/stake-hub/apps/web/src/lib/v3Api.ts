@@ -53,6 +53,37 @@ export type V3Era = {
   captured_at?: number
 }
 
+export type V3PayoutRow = {
+  era: number
+  validator: string
+  stake_pot: number | null
+  validator_total_stake_pot: number | null
+  stake_share_pct: number | null
+  era_reward_pot: number | null
+  validator_points: number
+  era_total_points: number
+  validator_payout_pot: number | null
+  commission_pct: number
+  nominator_pool_pot: number | null
+  reward_pot: number | null
+  claim_state: 'claimed' | 'unclaimed'
+  is_current_era: boolean
+  era_start_ms: number | null
+  payee: string | null
+}
+
+export type V3Payouts = {
+  address: string
+  current_era: number
+  eras: number[]
+  payee: string | null
+  rows: V3PayoutRow[]
+  era_starts: Record<string, number>
+  totals: { reward_pot: number; claimed_pot: number; pending_pot: number; era_count: number }
+  source: string
+  served_from?: 'live' | 'cache'
+}
+
 const V3_API_BASE = '/api/v3'
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -100,6 +131,8 @@ export const v3Api = {
       bonding_duration_eras: null,
     }
   },
+  payouts: (address: string, eras = 8, signal?: AbortSignal) =>
+    get<V3Payouts>(`/payouts?address=${encodeURIComponent(address)}&eras=${eras}`, signal),
   validatorList: async (signal?: AbortSignal) => {
     const data = await v3Api.validators(signal)
     return { validators: data.validators.map((v) => ({ address: v.address, name: v3ValidatorName(v), commission: commissionToPercent(v.commission_pct), total_stake_pot: v.total_pot === null ? null : toNumber(v.total_pot), status: 'Active' as const, status_source: 'V3 Session.Validators', data_errors: v.data_errors || [] })) }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { v3Api, v3ValidatorName, toNumber } from '../lib/v3Api'
+import { formatTPot } from '../lib/formatPot'
 
 interface Stats {
   block_height: number | null
@@ -34,12 +35,6 @@ interface Validator {
   total_stake_pot: number | null
   status?: 'Active' | 'Inactive' | 'Unknown'
   status_source?: string | null
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-  return response.json() as Promise<T>
 }
 
 function formatUpdated(lastUpdate: Date | null) {
@@ -218,7 +213,6 @@ export default function Home() {
   const [validatorsError, setValidatorsError] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  const [dotPrice, setDotPrice] = useState<number | null>(null)
 
   const loadData = async () => {
     setStatsError(false)
@@ -247,13 +241,6 @@ export default function Home() {
     setValidatorsLoading(false)
     if (statsResult.status === 'fulfilled' || overviewResult.status === 'fulfilled' || validatorsResult.status === 'fulfilled') {
       setLastUpdate(new Date())
-    }
-
-    try {
-      const price = await fetchJson<{ polkadot?: { usd?: number } }>('https://api.coingecko.com/api/v3/simple/price?ids=polkadot&vs_currencies=usd')
-      setDotPrice(price?.polkadot?.usd ?? null)
-    } catch {
-      setDotPrice(null)
     }
   }
 
@@ -295,12 +282,12 @@ export default function Home() {
         </div>
 
         {/* content */}
-        <div className="relative z-10 max-w-2xl mr-auto">
+        <div className="relative z-10 max-w-2xl mr-auto lg:pl-4">
           <h1 className="text-[40px] md:text-[64px] text-white tracking-tight leading-[1.03] mb-6 font-bold max-w-2xl">
             Stake Smarter. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#c0c1ff] to-[#8b5cf6]">Choose Better.</span>
           </h1>
           <p className="text-[18px] md:text-[20px] text-slate-300 max-w-xl leading-relaxed mb-10">
-            Explore validators, stake POT, and track your staking activity in one place.
+            Explore validators, stake tPOT, and track your staking activity in one place.
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -339,8 +326,8 @@ export default function Home() {
             loading={!overview && !overviewError}
             error={overviewError}
             onRetry={loadData}
-            value={overview ? (overview.total_staked_pot / 1e6).toFixed(2) + 'M POT' : '—'}
-            sub="Snapshot · no price"
+            value={overview ? formatTPot(overview.total_staked_pot) : '—'}
+            sub="Era snapshot · chain units"
 
             icon="token"
           />
@@ -416,7 +403,7 @@ export default function Home() {
           <div><h2 className="text-[38px] md:text-[48px] text-white font-bold tracking-tight leading-[1.05]">Find your validators</h2><p className="text-[16px] text-slate-300 mt-3">A quick look at the V3 testnet validators. Compare commission, stake, and live session status.</p></div>
           <button onClick={() => nav('/validators')} className="shrink-0 text-[15px] font-semibold text-primary hover:text-secondary">Explore All Validators →</button>
         </div>
-        {validatorsError ? <div className="pd-card rounded-2xl border border-white/[0.07] px-6 py-12 text-center text-slate-300"><p className="text-amber-400">Validator data unavailable.</p><button onClick={loadData} className="mt-3 text-primary hover:underline">Retry</button></div> : validatorsLoading ? <div className="pd-card rounded-2xl border border-white/[0.07] px-6 py-12 text-center text-slate-300">Loading validator spotlight…</div> : <div className="grid grid-cols-1 md:grid-cols-3 gap-5">{filtered.map(v => { const status = v.status; return <article key={v.address} className="pd-card rounded-2xl border border-white/[0.07] p-6"><div className="flex items-center justify-between gap-3"><span className="text-[18px] font-semibold text-white truncate">{v.name && v.name !== `${v.address.slice(0, 8)}…${v.address.slice(-6)}` ? v.name : "Validator"}</span>{status ? <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border ${statusPill(status)}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot(status)}`} />{status}</span> : <span className="text-[11px] text-slate-300">Status unavailable</span>}</div><p className="mt-3 text-[12px] text-slate-300 font-mono">{v.address.slice(0, 8)}…{v.address.slice(-6)}</p><div className="mt-6 grid grid-cols-2 gap-4"><div><span className="block text-[11px] uppercase tracking-wider text-slate-300">Commission</span><strong className="block mt-1 text-[18px] text-emerald-300">{typeof v.commission === 'number' ? `${v.commission.toFixed(1)}%` : 'Unavailable'}</strong></div><div><span className="block text-[11px] uppercase tracking-wider text-slate-300">Total Stake</span><strong className="block mt-1 text-[18px] text-white">{v.total_stake_pot ? `${(v.total_stake_pot / 1e6).toFixed(1)}M POT` : 'Unavailable'}</strong></div></div></article>})}</div>}
+        {validatorsError ? <div className="pd-card rounded-2xl border border-white/[0.07] px-6 py-12 text-center text-slate-300"><p className="text-amber-400">Validator data unavailable.</p><button onClick={loadData} className="mt-3 text-primary hover:underline">Retry</button></div> : validatorsLoading ? <div className="pd-card rounded-2xl border border-white/[0.07] px-6 py-12 text-center text-slate-300">Loading validator spotlight…</div> : <div className="grid grid-cols-1 md:grid-cols-3 gap-5">{filtered.map(v => { const status = v.status; return <article key={v.address} className="pd-card rounded-2xl border border-white/[0.07] p-6"><div className="flex items-center justify-between gap-3"><span className="text-[18px] font-semibold text-white truncate">{v.name && v.name !== `${v.address.slice(0, 8)}…${v.address.slice(-6)}` ? v.name : "Validator"}</span>{status ? <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border ${statusPill(status)}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot(status)}`} />{status}</span> : <span className="text-[11px] text-slate-300">Status unavailable</span>}</div><p className="mt-3 text-[12px] text-slate-300 font-mono">{v.address.slice(0, 8)}…{v.address.slice(-6)}</p><div className="mt-6 grid grid-cols-2 gap-4"><div><span className="block text-[11px] uppercase tracking-wider text-slate-300">Commission</span><strong className="block mt-1 text-[18px] text-emerald-300">{typeof v.commission === 'number' ? `${v.commission.toFixed(1)}%` : 'Unavailable'}</strong></div><div><span className="block text-[11px] uppercase tracking-wider text-slate-300">Total Stake</span><strong className="block mt-1 text-[18px] text-white">{v.total_stake_pot != null ? formatTPot(v.total_stake_pot) : 'Unavailable'}</strong></div></div></article>})}</div>}
       </section>
 
       {/* CLOSING CTA */}
@@ -495,7 +482,7 @@ export default function Home() {
                       </td>
                       <td className="py-6 px-6 text-[18px] font-metric-md text-on-surface-variant group-hover:text-primary transition-colors">{v.address.slice(0, 8)}…{v.address.slice(-6)}</td>
                       <td className="py-6 px-6 text-[18px] font-metric-md text-tertiary">{v.commission?.toFixed(1)}%</td>
-                      <td className="py-6 px-6 text-[18px] font-metric-md text-on-surface font-medium">{v.total_stake_pot ? (v.total_stake_pot / 1e6).toFixed(1) + 'M POT' : '—'}</td>
+                      <td className="py-6 px-6 text-[18px] font-metric-md text-on-surface font-medium">{v.total_stake_pot != null ? formatTPot(v.total_stake_pot, 1) : '—'}</td>
                       <td className="py-6 px-6 text-right">
                         <span title={status === 'Active' ? 'Present in the live Session.Validators set.' : status === 'Inactive' ? 'Not present in the live Session.Validators set.' : 'Live activity status could not be verified.'} className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[14px] font-table-header border ${statusPill(status)}`}>
                           <span className={`w-2 h-2 rounded-full ${statusDot(status)}`}></span>

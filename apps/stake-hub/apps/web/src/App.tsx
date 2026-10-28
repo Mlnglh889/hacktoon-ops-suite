@@ -20,7 +20,7 @@ function Footer() {
       <div className="flex flex-col md:flex-row justify-between items-center w-full px-space-lg py-space-md max-w-[1600px] mx-auto gap-space-sm">
         <div className="text-[15px] text-on-surface-variant flex items-center gap-2 text-center md:text-left">
           <span className="w-1.5 h-1.5 rounded-full bg-primary/80"></span>
-          <span>© 2025 PORTALDOT · Substrate NPoS Consensus Engine · Non-Custodial</span>
+          <span>© {new Date().getFullYear()} PORTALDOT · Substrate NPoS Consensus Engine · Non-Custodial</span>
         </div>
         <nav className="flex items-center flex-wrap justify-center gap-6">
           {['Network Telemetry', 'Consensus Specs', 'Validator Portal', 'Docs'].map((l) => (
@@ -43,7 +43,7 @@ export default function App() {
     <Route path="/overview" element={<Overview />} />
     <Route path="/stake" element={<Stake />} />
     <Route path="/unstake" element={<Unstake />} />
-    <Route path="/payouts" element={<Payouts />} />
+    <Route path="/payouts" element={<Portfolio />} />
     <Route path="/portfolio" element={<Portfolio />} />
     <Route path="/validators" element={<Validators />} />
     <Route path="/infra" element={<Infra />} />
@@ -56,7 +56,7 @@ export default function App() {
   // Stitch header/content shell and does not add the legacy floating wallet
   // button or footer around it.
   if (isUnstake) return (
-    <div className="bg-[#020617] text-on-surface min-h-screen relative overflow-x-hidden selection:bg-secondary-container selection:text-primary-fixed">
+    <div className="pd-app-shell text-on-surface min-h-screen relative overflow-x-hidden selection:bg-secondary-container selection:text-primary-fixed">
       <SideNav />
       <div className="lg:pl-[182px] min-h-screen">
         <div className="wallet-floating fixed top-4 right-4 sm:top-6 sm:right-8 z-[100]">
@@ -68,12 +68,12 @@ export default function App() {
   )
 
   return (
-    <div className="bg-[#020617] text-on-surface min-h-screen flex flex-col relative overflow-x-hidden selection:bg-secondary-container selection:text-primary-fixed">
+    <div className="pd-app-shell text-on-surface min-h-screen flex flex-col relative overflow-x-hidden selection:bg-secondary-container selection:text-primary-fixed">
       {isHome && <CosmicBackground />}
       <SideNav />
       <div className="lg:pl-[182px] flex flex-col min-h-screen">
-        {(isHome || loc.pathname === '/stake' || loc.pathname === '/validators') && (
-          <div className="fixed top-4 right-4 sm:top-6 sm:right-8 z-50">
+        {(isHome || loc.pathname === '/stake' || loc.pathname === '/validators' || loc.pathname === '/portfolio' || loc.pathname === '/payouts') && (
+          <div className="hidden lg:block fixed top-4 right-4 sm:top-6 sm:right-8 z-50">
             <WalletButton />
           </div>
         )}

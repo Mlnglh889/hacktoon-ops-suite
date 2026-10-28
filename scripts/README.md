@@ -24,8 +24,6 @@ python scripts/prepare_heartbeat.py \
 
 Do not put private keys or seed phrases in this repository, chat, shell history, or `.env`.
 No transaction is considered complete until its receipt status and explorer URL are verified.
-沿
-## Current blocker
 
 The repo contains source, compiled artifact, and deterministic payload preparation. Signing and broadcast require the wallet UI or an explicit signer controlled by the user.
 

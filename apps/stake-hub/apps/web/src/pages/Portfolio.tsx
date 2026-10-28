@@ -1,28 +1,253 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useWallet } from '../lib/walletContext'
-import { v3Api } from '../lib/v3Api'
-import { useEffect, useState } from 'react'
+import { v3Api, type V3Payouts } from '../lib/v3Api'
 
-const fmt = (value: number | null) => value === null ? 'Unavailable' : value.toLocaleString('en-US', { maximumFractionDigits: 4 })
+const fmt = (value: number | null | undefined, digits = 4) => value === null || value === undefined ? '—' : value.toLocaleString('en-US', { maximumFractionDigits: digits })
+/* Fixed precision per column so decimal points line up down the table. */
+const fmtFixed = (value: number | null | undefined, digits: number) => value === null || value === undefined
+  ? '—'
+  : value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+const short = (address: string) => `${address.slice(0, 8)}…${address.slice(-6)}`
+/* Payee can be a keyword like "Staked" instead of an SS58 address. Only
+   abbreviate values that actually look like an address. */
+const shortMaybeAddress = (value: string | null | undefined) => {
+  if (!value) return '—'
+  return /^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(value) ? short(value) : value
+}
+
+type Tab = 'position' | 'nominations'
+
+function Metric({ label, value, note, tone }: { label: string; value: string; note?: string; tone: 'cyan' | 'purple' | 'muted' | 'green' }) {
+  const colors = { cyan: 'text-[#22D3EE]', purple: 'text-[#8B5CF6]', muted: 'text-[#94A3B8]', green: 'text-[#4ADE80]' }
+  return (
+    <div className="pf-metric">
+      <div className="flex items-center justify-between gap-2">
+        <span className="pf-label">{label}</span>
+        <span className={`${colors[tone]} text-[8px] leading-none`}>●</span>
+      </div>
+      <div className="pf-value">{value}</div>
+      {note && <div className="pf-note">{note}</div>}
+    </div>
+  )
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="pf-field">
+      <span className="pf-label">{label}</span>
+      <span className={`pf-field-value ${mono ? 'font-mono break-all' : ''}`}>{value}</span>
+    </div>
+  )
+}
+
+function StatusPill({ state, payable }: { state: string; payable: boolean }) {
+  const claimed = state === 'claimed'
+  const cls = !payable ? 'pf-pill pf-pill-idle' : claimed ? 'pf-pill pf-pill-ok' : 'pf-pill pf-pill-warn'
+  const text = !payable ? 'Not payable' : claimed ? 'Claimed' : 'Claimable'
+  return <span className={cls}>{text}</span>
+}
+
+const formatEraTime = (ms: number | null) => ms === null ? '—' : new Date(ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 export default function Portfolio() {
-  const { account, connect, chainData, refreshChainData } = useWallet()
+  const { account, chainData } = useWallet()
+  const [params] = useSearchParams()
+  // Read-only viewing: /portfolio?address=<SS58> computes payouts for any wallet
+  // without an extension. It never signs and never shows it as a connected wallet.
+  const readOnlyAddress = useMemo(() => {
+    const candidate = (params.get('address') || '').trim()
+    return /^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(candidate) ? candidate : null
+  }, [params])
+  const payoutAddress = account?.address ?? readOnlyAddress
+  const [tab, setTab] = useState<Tab>('position')
   const [network, setNetwork] = useState<Awaited<ReturnType<typeof v3Api.overview>> | null>(null)
+  const [payouts, setPayouts] = useState<V3Payouts | null>(null)
+  const [payoutError, setPayoutError] = useState<string | null>(null)
+  const [payoutLoading, setPayoutLoading] = useState(false)
+
   useEffect(() => { v3Api.overview().then(setNetwork).catch(() => {}) }, [])
-  return <main className="relative z-10 flex-1 w-full max-w-[1480px] mx-auto px-margin-mobile md:px-margin py-8 md:py-10 space-y-7">
-    <header><div className="text-[11px] uppercase tracking-[0.18em] text-primary mb-3">PortaldotV3 Testnet · Personal view</div><h1 className="text-[38px] md:text-[48px] leading-none font-bold text-white">Your portfolio</h1><p className="text-[15px] text-white/45 mt-3">Wallet-scoped staking positions read directly from the V3 chain.</p></header>
-    {!account ? <section className="rounded-2xl border border-violet-400/20 bg-violet-950/20 p-6 flex items-center justify-between gap-4"><div><strong className="text-white">Connect your Portaldot extension</strong><p className="text-sm text-white/45 mt-1">Connect an SS58 account to load wallet-specific data.</p></div><button onClick={() => { void connect() }} className="px-4 py-2.5 rounded-xl bg-violet-600 text-white font-semibold">Connect wallet</button></section> : <section className="rounded-2xl border border-emerald-400/20 bg-emerald-950/20 p-6"><div className="flex items-start justify-between gap-4 flex-wrap"><div><strong className="text-white">Connected account</strong><p className="font-mono text-sm text-emerald-200 mt-2 break-all">{account.address}</p></div><button onClick={() => { void refreshChainData() }} className="px-3 py-2 rounded-lg border border-white/10 text-xs text-white/70">Refresh reads</button></div>{chainData.status === 'loading' && <p className="text-xs text-white/45 mt-3">Reading V3 account, staking ledger, and nominations…</p>}{chainData.status === 'error' && <p className="text-xs text-rose-300 mt-3">{chainData.error}</p>}{chainData.status === 'ready' && <p className="text-xs text-emerald-300 mt-3">Live chain read · refreshed {chainData.refreshedAt ? new Date(chainData.refreshedAt).toLocaleTimeString() : '—'}</p>}</section>}
-    <section className="grid grid-cols-1 md:grid-cols-3 gap-4"><Metric label="Free balance" value={`${fmt(chainData.freePot)} tPOT`} note={chainData.freePot === null ? 'Connect wallet to read' : 'system.account'} /><Metric label="Bonded stake" value={chainData.bondedPot === null ? 'None' : `${fmt(chainData.bondedPot)} tPOT`} note={chainData.hasLedger ? 'staking.ledger' : 'No staking ledger'} /><Metric label="Unlocking" value={`${fmt(chainData.unlockingPot)} tPOT`} note={`${chainData.unlockingCount} unlock chunk(s)`} /></section>
-    <section className="pd-card rounded-2xl border border-white/[0.07] p-6"><div className="flex items-center justify-between gap-3 flex-wrap"><div><h2 className="text-white font-semibold text-lg">Current nominations</h2><p className="text-sm text-white/45 mt-1">Read from the connected wallet’s staking state.</p></div><span className="text-xs text-white/40">{chainData.nominations.length} target(s)</span></div>{chainData.nominations.length ? <div className="mt-4 grid gap-2">{chainData.nominations.map((address) => <div key={address} className="font-mono text-xs text-emerald-200 bg-white/[0.03] rounded-lg p-3 break-all">{address}</div>)}</div> : <p className="mt-4 text-sm text-white/45">No verified nominations found. This is a real empty state, not example data.</p>}</section>
-    <section className="pd-card rounded-2xl border border-white/[0.07] p-6"><h2 className="text-white font-semibold text-lg">Network context</h2><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5"><Metric label="Network" value="V3 Testnet" /><Metric label="Era" value={network?.latest_era == null ? '—' : `#${network.latest_era}`} /><Metric label="Validators" value={String(network?.validator_count ?? '—')} /><Metric label="Stake" value={`${network?.total_stake_pot ?? 0} POT`} /></div></section>
-    <Link to="/stake" className="inline-block text-primary hover:underline">Open V3 staking flow →</Link>
-  </main>
+
+  useEffect(() => {
+    if (!payoutAddress) { setPayouts(null); setPayoutError(null); return }
+    let alive = true
+    setPayoutLoading(true)
+    setPayoutError(null)
+    v3Api.payouts(payoutAddress, 8)
+      .then((data) => { if (alive) setPayouts(data) })
+      .catch((error) => { if (alive) setPayoutError(error instanceof Error ? error.message : 'Payout read failed') })
+      .finally(() => { if (alive) setPayoutLoading(false) })
+    return () => { alive = false }
+  }, [payoutAddress])
+
+  const rows = payouts?.rows ?? []
+  const totals = payouts?.totals
+  const eraLabel = network?.latest_era == null ? 'Era —' : `Era #${network.latest_era}`
+  const emptyHint = payoutAddress ? `No staking exposure for ${short(payoutAddress)} in the last ${payouts?.eras.length ?? 8} eras.` : 'Connect a wallet to read payouts.'
+
+  return (
+    <main className="portfolio-page relative z-10 flex-1 w-full max-w-[1520px] mx-auto px-4 sm:px-6 pt-24 lg:pt-[76px] pb-10 space-y-5">
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
+        <Metric label="Available" value={chainData.freePot === null ? '—' : `${fmt(chainData.freePot)} tPOT`} note={chainData.freePot === null ? 'Connect wallet' : 'Ready to stake'} tone="cyan" />
+        <Metric label="Staked" value={chainData.bondedPot === null ? '—' : `${fmt(chainData.bondedPot)} tPOT`} note={chainData.hasLedger ? 'On-chain ledger' : 'No active stake'} tone="purple" />
+        <Metric label="Unlocking" value={`${fmt(chainData.unlockingPot)} tPOT`} note={`${chainData.unlockingCount} chunk(s) pending`} tone="muted" />
+        <Metric label="Nominations" value={`${chainData.nominations.length}`} note="Validator targets" tone="green" />
+      </section>
+
+      <section className="pf-card">
+        <div className="pf-card-head">
+          <div className="pf-tabs">
+            <button onClick={() => setTab('position')} className={`pf-tab ${tab === 'position' ? 'is-active' : ''}`}>Position</button>
+            <button onClick={() => setTab('nominations')} className={`pf-tab ${tab === 'nominations' ? 'is-active' : ''}`}>
+              Validators
+              <span className="pf-tab-count">{chainData.nominations.length}</span>
+            </button>
+          </div>
+          <div className="pf-meta">
+            <span>{eraLabel}</span>
+            <span className="pf-live"><i />Live read</span>
+          </div>
+        </div>
+
+        {tab === 'position' ? (
+          <div className="pf-body">
+            <div className="pf-fields">
+              <Field label="Wallet" value={account ? short(account.address) : readOnlyAddress ? `${short(readOnlyAddress)} (read-only)` : '—'} mono />
+              <Field label="Network era" value={network?.latest_era == null ? '—' : `#${network.latest_era}`} />
+              <Field label="Last read" value={chainData.refreshedAt ? new Date(chainData.refreshedAt).toLocaleTimeString() : '—'} />
+              <Field label="Available" value={chainData.freePot === null ? '—' : `${fmt(chainData.freePot)} tPOT`} />
+              <Field label="Staked" value={chainData.bondedPot === null ? '—' : `${fmt(chainData.bondedPot)} tPOT`} />
+              <Field label="Unlocking" value={`${fmt(chainData.unlockingPot)} tPOT`} />
+            </div>
+            <div className="pf-source">Connected wallet · live Substrate RPC</div>
+          </div>
+        ) : (
+          <div className="pf-table-wrap">
+            <table className="pf-table">
+              <thead>
+                <tr>
+                  <th>Validator</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                  <th className="pf-num">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chainData.nominations.length ? chainData.nominations.map((address) => (
+                  <tr key={address}>
+                    <td className="font-mono text-[#22D3EE] break-all">{address}</td>
+                    <td><span className="pf-pill pf-pill-ok">Active</span></td>
+                    <td className="text-[#94A3B8]">Validator target</td>
+                    <td className="pf-num text-[#a78bfa]">View →</td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={4} className="pf-empty">No nominated validators yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="pf-card">
+        <div className="pf-card-head">
+          <div className="flex items-center gap-2.5">
+            <h2 className="pf-title">Payout history</h2>
+            <span className="pf-chip">{payouts?.eras.length ?? 8} eras</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {payouts && <span className="pf-chip">{payouts.served_from === 'cache' ? 'Cached' : 'Chain'}</span>}
+            <span className="pf-chip pf-chip-warn">Chain-verified</span>
+          </div>
+        </div>
+
+        <div className="pf-summary">
+          <div className="pf-summary-item">
+            <span className="pf-label">Reward in window</span>
+            <span className="pf-summary-value">{totals ? `${fmtFixed(totals.reward_pot, 6)} tPOT` : '—'}</span>
+          </div>
+          <div className="pf-summary-item">
+            <span className="pf-label">Claimed</span>
+            <span className="pf-summary-value text-[#4ADE80]">{totals ? `${fmtFixed(totals.claimed_pot, 6)} tPOT` : '—'}</span>
+          </div>
+          <div className="pf-summary-item">
+            <span className="pf-label">Payee</span>
+            <span className="pf-summary-value pf-summary-mono">{shortMaybeAddress(payouts?.payee)}</span>
+          </div>
+        </div>
+
+        <div className="pf-table-wrap hidden md:block">
+          <table className="pf-table">
+            <thead>
+              <tr>
+                <th>Era</th>
+                <th>Era start</th>
+                <th>Validator</th>
+                <th className="pf-num">Your stake</th>
+                <th className="pf-num">Era reward</th>
+                <th className="pf-num">Commission</th>
+                <th className="pf-num">Your reward</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payoutLoading && !rows.length ? (
+                <tr><td colSpan={8} className="pf-empty">Reading staking storage…</td></tr>
+              ) : payoutError ? (
+                <tr><td colSpan={8} className="pf-empty pf-empty-error">{payoutError}</td></tr>
+              ) : rows.length ? rows.map((row) => (
+                <tr key={`${row.era}-${row.validator}`}>
+                  <td>
+                    <span className="pf-era">#{row.era}</span>
+                    {row.is_current_era && <span className="pf-live-tag">Live</span>}
+                  </td>
+                  <td className="font-mono text-[#8a94b8] whitespace-nowrap">{formatEraTime(row.era_start_ms)}</td>
+                  <td className="font-mono text-[#22D3EE]" title={row.validator}>{short(row.validator)}</td>
+                  <td className="pf-num">{fmtFixed(row.stake_pot, 4)}</td>
+                  <td className="pf-num text-[#8a94b8]">{row.era_reward_pot === null ? 'pending' : fmtFixed(row.era_reward_pot, 4)}</td>
+                  <td className="pf-num text-[#8a94b8]">{row.commission_pct}%</td>
+                  <td className={`pf-num ${row.reward_pot === null ? 'text-[#8a94b8]' : 'pf-reward'}`}>{row.reward_pot === null ? 'pending' : fmtFixed(row.reward_pot, 8)}</td>
+                  <td><StatusPill state={row.claim_state} payable={row.reward_pot !== null} /></td>
+                </tr>
+              )) : (
+                <tr><td colSpan={8} className="pf-empty">{emptyHint}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="md:hidden">
+          {payoutLoading && !rows.length ? (
+            <div className="pf-empty">Reading staking storage…</div>
+          ) : payoutError ? (
+            <div className="pf-empty pf-empty-error">{payoutError}</div>
+          ) : rows.length ? rows.map((row) => (
+            <div key={`${row.era}-${row.validator}`} className="pf-mobile-row">
+              <div className="flex items-center justify-between gap-3">
+                <span className="pf-era">#{row.era}{row.is_current_era && <span className="pf-live-tag">Live</span>}</span>
+                <StatusPill state={row.claim_state} payable={row.reward_pot !== null} />
+              </div>
+              <div className="pf-mobile-value">
+                {row.reward_pot === null ? 'pending' : `${fmt(row.reward_pot, 8)} tPOT`}
+              </div>
+              <div className="pf-mobile-meta">
+                <span className="font-mono text-[#22D3EE]">{short(row.validator)}</span>
+                <span>{formatEraTime(row.era_start_ms)}</span>
+                <span>stake {fmtFixed(row.stake_pot, 4)}</span>
+                <span>comm {row.commission_pct}%</span>
+              </div>
+            </div>
+          )) : <div className="pf-empty">{emptyHint}</div>}
+        </div>
+
+        <div className="pf-foot">
+          <span>{rows.length ? `${rows.length} record(s)` : 'No records'}</span>
+          <span className="font-mono">{payouts?.source ? 'Portaldot V3 staking storage' : 'Awaiting wallet'}</span>
+        </div>
+      </section>
+    </main>
+  )
 }
-function Metric({ label, value, note }: { label: string; value: string; note?: string }) { return <div className="pd-card rounded-2xl border border-white/[0.07] p-5"><span className="text-[11px] uppercase tracking-wider text-white/40">{label}</span><div className="text-white font-bold text-2xl mt-2">{value}</div>{note && <p className="text-xs text-white/35 mt-2">{note}</p>}</div> }
 
 export type PortfolioMode = 'v3-testnet-wallet-read'
-export const portfolioMode: PortfolioMode = 'v3-testnet-wallet-read'
-
-// All personal values above come from the connected V3 account; unavailable remains explicit.
-const WALLET_READS_ARE_LIVE = true
-if (!WALLET_READS_ARE_LIVE) throw new Error('unreachable')

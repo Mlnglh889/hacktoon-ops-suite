@@ -1,14 +1,31 @@
 .venv/
 .env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
+.pytest_cache/
 data/*.db
 data/*.sqlite*
 node_modules/
+# Lockfiles are tracked for reproducible installs (the web app's lockfile
+# pins the exact dependency tree used by CI and by the live build).
 package-lock.json
+!apps/stake-hub/apps/web/package-lock.json
 data/heartbeat-payload.json
 dist/
 *.tsbuildinfo
 *.key
 *.pem
 keystore*
+*.bak
+*.bak.*
+.DS_Store
+.vite/
+
+# Local cross-session working notes (not product documentation)
+STATUS.md
+
+# Runtime snapshot stores (recreated by the collector / API on first run)
+**/data/*.db
+**/data/*.sqlite*

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStats } from '../hooks/useStats'
+import { useWallet } from '../lib/walletContext'
 
 interface Msg {
   who: 'dot' | 'user'
@@ -10,17 +11,29 @@ interface Msg {
   badgeCls?: string
 }
 
+type AiHealth = {
+  provider: string
+  model: string
+  models: string[]
+  base_url: string
+  has_key: boolean
+  timeout_s: number
+  context_bytes: number
+}
+
 const now = () =>
   new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' UTC'
 
 export default function AskDot() {
   const stats = useStats()
+  const { account } = useWallet()
+  const [health, setHealth] = useState<AiHealth | null>(null)
   const [messages, setMessages] = useState<Msg[]>([
     {
       who: 'dot',
       time: now(),
-      source: 'Source: Live Chain Data',
-      text: "Hi, I'm your Portaldot AI assistant. Ask me about V3 testnet validator data, commission risk, reward points, or verified network state.",
+      source: 'Source: live V3 data + app status',
+      text: "Hi, I'm Dot. I can answer questions about this dashboard and the Portaldot V3 chain: why a table is empty, what Slow/Degraded means, why a stake or unstake failed, whether your payouts are claimed, or whether Telegram alerts are actually being delivered.",
     },
   ])
   const [input, setInput] = useState('')
@@ -42,6 +55,15 @@ export default function AskDot() {
 
   const scroll = () => setTimeout(() => chatRef.current?.scrollTo(0, chatRef.current.scrollHeight), 60)
 
+  useEffect(() => {
+    let alive = true
+    fetch('/api/v1/ai/health', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setHealth(d) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+
   const send = async (q: string) => {
     if (!q.trim() || busy) return
     setMessages((m) => [...m, { who: 'user', text: q, time: now() }])
@@ -56,17 +78,29 @@ export default function AskDot() {
       const r = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: q }),
+        // The connected wallet address lets Dot answer portfolio and payout questions
+        // for this specific account instead of guessing.
+        body: JSON.stringify({ message: q, address: account?.address ?? null }),
       })
       const d = await r.json()
+      // The badge must reflect what actually happened. A model failure is shown as a
+      // warning with the real error, never as a green "deterministic analysis" badge.
+      const ok = d.ok === true && Boolean(d.reply)
       setMessages((m) => [
         ...m,
         {
           who: 'dot',
           text: d.reply || 'Could not reach the chain. Try again.',
           time: now(),
-          badge: 'Deterministic Era Analysis',
-          badgeCls: 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30',
+          badge: ok
+            ? `Grounded · ${d.model || 'live V3 context'}`
+            : 'Model unavailable — no guess',
+          badgeCls: ok
+            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
+            : 'bg-amber-950/40 text-amber-300 border-amber-500/30',
+          source: ok
+            ? `Source: V3 chain + app status${typeof d.elapsed_s === 'number' ? ` · ${d.elapsed_s}s` : ''}`
+            : (d.error ? `Error: ${d.error}` : undefined),
         },
       ])
     } catch {
@@ -77,13 +111,23 @@ export default function AskDot() {
     }
   }
 
-  const chips = ['Safest validator right now?', 'Rewards for 1000 POT?', 'Who to avoid?', 'Network status']
+  const chips = [
+    'Why is my portfolio empty?',
+    'Why does RPC say Degraded?',
+    'Are my rewards claimed?',
+    'Why did my stake fail?',
+  ]
 
   const telemetry = [
     { label: 'Current Era', value: stats ? stats.era.toLocaleString() : '—', cls: 'text-white' },
-    { label: 'Nodes Monitored', value: stats ? `${stats.validators} Active` : '—', cls: 'text-tertiary' },
-    { label: 'Slashing Engine', value: 'Monitoring', cls: 'text-emerald-400' },
-    { label: 'Runtime', value: 'Live Grounded', cls: 'text-secondary' },
+    { label: 'Block', value: stats ? stats.block_height.toLocaleString() : '—', cls: 'text-white' },
+    { label: 'Active Validators', value: stats ? `${stats.validators}` : '—', cls: 'text-tertiary' },
+    // Provider/model actually in use, read from /api/v1/ai/health. Never hardcoded.
+    {
+      label: 'AI Model',
+      value: health ? (health.has_key ? health.model.split('/').pop() || health.model : 'No key') : '—',
+      cls: health?.has_key ? 'text-secondary' : 'text-amber-300',
+    },
   ]
 
   return (
@@ -202,7 +246,7 @@ export default function AskDot() {
                   send(v)
                 }
               }}
-              placeholder="Ask AI about Portaldot V3 testnet…"
+              placeholder={account ? `Ask about the dashboard or wallet ${account.address.slice(0, 6)}…${account.address.slice(-4)}` : 'Ask about this dashboard or Portaldot V3…'}
               className="flex-1 bg-surface-container-lowest border border-white/15 rounded-lg px-4 py-3 text-body-sm placeholder:text-outline focus:outline-none focus:border-primary/60"
             />
             <button

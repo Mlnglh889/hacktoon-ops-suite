@@ -128,7 +128,7 @@ export function useAmount(max: number) {
 export function FieldLabel({ children }: { children: React.ReactNode }) { return <label className="mb-2 block text-[10px] uppercase tracking-[.12em] text-[#8995bb]">{children}</label> }
 
 export function AmountField({ amount, setAmount, max }: { amount: string; setAmount: (v: string) => void; max: number }) {
-  return <div className="flex h-12 items-center rounded-lg border border-[#4c4ca9] bg-[#070f2c] px-3 focus-within:ring-2 focus-within:ring-[#8b55ff]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" className="w-full bg-transparent text-[20px] font-semibold text-white outline-none" /><span className="text-[13px] font-bold text-[#d0d5e8]">POT</span></div>
+  return <div className="flex h-12 items-center rounded-lg border border-[#4c4ca9] bg-[#070f2c] px-3 focus-within:ring-2 focus-within:ring-[#8b55ff]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" className="w-full bg-transparent text-[20px] font-semibold text-white outline-none" /><span className="text-[13px] font-bold text-[#d0d5e8]">tPOT</span></div>
 }
 
 export function unavailableTransaction(): never { throw new Error('Wallet signing and staking transaction integration are not available in the current application.') }

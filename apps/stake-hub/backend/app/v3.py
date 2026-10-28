@@ -344,3 +344,60 @@ def overview():
 def infra_rpc(window: str = "latest"):
     from app.rpc_health import report
     return report(window if window in {"latest", "1h", "24h", "7d"} else "latest")
+
+
+@router.get("/telegram/status")
+def telegram_status():
+    """Delivery status read from the Telegram worker's own state, not from the UI."""
+    from app.telegram_alerts import status_snapshot
+    return status_snapshot()
+
+
+@router.get("/incidents")
+def infra_incidents(window: str = "24h"):
+    """Incident timeline derived only from persisted snapshots and probe samples."""
+    import json
+    from app import incidents as inc
+    from app.v3_snapshots import _con as snapshot_con
+    from app import rpc_health
+
+    window_seconds = {"1h": 3600, "24h": 86400, "7d": 604800}.get(window, 86400)
+    since = int(__import__("time").time()) - window_seconds
+
+    changes = []
+    snapshot_id = None
+    with snapshot_con() as con:
+        row = con.execute("SELECT id FROM v3_snapshots ORDER BY id DESC LIMIT 1").fetchone()
+        if row:
+            snapshot_id = row["id"]
+        for change in con.execute(
+            "SELECT detected_at, snapshot_id, address, field, old_value, new_value FROM v3_changes"
+            " WHERE detected_at >= ? ORDER BY detected_at DESC LIMIT 5000",
+            (since,),
+        ):
+            changes.append({
+                "detected_at": change["detected_at"], "snapshot_id": change["snapshot_id"],
+                "address": change["address"], "field": change["field"],
+                "old": change["old_value"], "new": change["new_value"],
+            })
+
+    rpc_reports = []
+    for family, endpoint in (("substrate", rpc_health.endpoints()[0]), ("evm", rpc_health.endpoints()[-1])):
+        history = rpc_health._history(endpoint, since)
+        rpc_reports.append({
+            "endpoint": endpoint, "chain_family": family,
+            "samples": history["samples"], "block_progress": history["block_progress"],
+            "slow_ms": rpc_health.SLOW_MS, "degraded_ms": rpc_health.DEGRADED_MS,
+        })
+
+    result = inc.collect(validator_changes=changes, rpc_reports=rpc_reports)
+    result["window"] = window
+    result["window_seconds"] = window_seconds
+    result["since"] = since
+    result["sources"] = {
+        "validator_changes": {"rows": len(changes), "latest_snapshot_id": snapshot_id,
+                              "source": "v3_snapshots.db v3_changes"},
+        "rpc_samples": {"count": sum(len(r["samples"]) for r in rpc_reports),
+                        "source": "rpc_health.db rpc_samples"},
+    }
+    return result

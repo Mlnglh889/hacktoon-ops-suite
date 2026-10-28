@@ -5,7 +5,7 @@ import { v3Api } from '../lib/v3Api'
 import { decimalToPlanck, planckToPot, submitUnstaking, submitNominationChange, estimateNominationFee, getBondingDuration, type StakingUpdate } from '../lib/staking'
 
 const EXPLORER = 'https://node-console.portaldot.dev'
-const fmt = (value: string | number | null, digits = 4) => value === null ? 'Unavailable' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })
+const fmt = (value: string | number | null, digits = 4) => value === null ? '—' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })
 const short = (address: string) => `${address.slice(0, 8)}…${address.slice(-6)}`
 
 function Metric({ icon, label, value, note, tone = 'normal' }: { icon: string; label: string; value: string; note: string; tone?: 'normal' | 'green' | 'violet' | 'blue' }) {
@@ -104,8 +104,8 @@ export default function Unstake() {
       <div className="unstake-grid">
         <div className="unstake-main-column">
           <section className="unstake-metrics">
-            <Metric icon="account_balance" label="Bonded Balance" value={bonded === null ? 'Unavailable' : `${fmt(bonded)} tPOT`} note="Total locked stake" />
-            <Metric icon="bolt" label="Active Stake" value={active === null ? 'Unavailable' : `${fmt(active)} tPOT`} note="Maximum available to unstake" tone="green" />
+            <Metric icon="account_balance" label="Bonded Balance" value={bonded === null ? '—' : `${fmt(bonded)} tPOT`} note={bonded === null ? 'Connect wallet to read' : 'Total locked stake'} />
+            <Metric icon="bolt" label="Active Stake" value={active === null ? '—' : `${fmt(active)} tPOT`} note={active === null ? 'Connect wallet to read' : 'Maximum available to unstake'} tone="green" />
             <Metric icon="hourglass_top" label="Currently Unlocking" value={`${fmt(unlocking)} tPOT`} note="In cooldown period" tone="violet" />
             <Metric icon="pie_chart" label="Unlocking Chunks" value={String(chainData.unlockingCount)} note="Runtime ledger chunks" tone="blue" />
           </section>
@@ -121,7 +121,7 @@ export default function Unstake() {
                 <td className="mono" translate="no">Not reported by chain</td><td className="mono" translate="no">{commissionByAddress[address] === undefined ? '—' : `${commissionByAddress[address].toFixed(1)}%`}</td><td><span className="unstake-active"><i />Nominated</span></td><td><button type="button" className="unstake-row-action" onClick={() => setPercentage(1)}>Use max</button></td>
               </tr>)}
             </tbody></table></div>
-            <div className="unstake-table-footer"><span>Stake allocation is wallet-scoped.</span><span>Unbonding duration: {bondingEras ? `${bondingEras} eras (~${Math.round(bondingEras * 6 * 600 * 6 / 86400)} days)` : 'Unavailable'}</span></div>
+            <div className="unstake-table-footer"><span>Stake allocation is wallet-scoped.</span><span>Unbonding duration: {bondingEras ? `${bondingEras} eras (~${Math.round(bondingEras * 6 * 600 * 6 / 86400)} days)` : '—'}</span></div>
           </section>
 
           <section className="unstake-card">
@@ -166,11 +166,11 @@ export default function Unstake() {
 
         <aside className="unstake-card unstake-form-card">
           <div className="unstake-form-head"><div><h2>Unbond Capital</h2><p>Move active stake into the unbonding queue.</p></div><span className="material-symbols-outlined tone-violet" translate="no">lock_open</span></div>
-          <div className="unstake-available"><span>Active stake available</span><b>{active === null ? 'Unavailable' : `${fmt(active)} tPOT`}</b></div>
+          <div className="unstake-available"><span>Active stake available</span><b>{active === null ? 'Connect wallet' : `${fmt(active)} tPOT`}</b></div>
           <div className="unstake-field-label"><label htmlFor="unstake-input">Amount to unstake</label><button type="button" onClick={() => setPercentage(1)} disabled={activePlanck === null}>Use maximum</button></div>
           <div className="unstake-input-wrap"><input id="unstake-input" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.0000" aria-invalid={amountInvalid} /><strong>tPOT</strong></div>
           <div className="unstake-quick">{[.25, .5, .75, 1].map((percentage, index) => <button key={percentage} type="button" disabled={activePlanck === null} onClick={() => setPercentage(percentage)}>{index === 3 ? 'Max' : `${percentage * 100}%`}</button>)}</div>
-          <div className="unstake-review-box"><div className="unstake-review-title">Transaction review</div><Row label="Unstake amount" value={valid ? `${fmt(amount)} tPOT` : '—'} /><Row label="Active stake remaining" value={remaining === null ? '—' : `${fmt(remaining)} tPOT`} /><Row label="Unlocking after tx" value={valid ? `${fmt(Number(unlocking) + Number(amount))} tPOT` : '—'} /><Row label="Network fee" value="Calculated before signing" muted /><Row label="Unbonding period" value="Unavailable" muted /></div>
+          <div className="unstake-review-box"><div className="unstake-review-title">Transaction review</div><Row label="Unstake amount" value={valid ? `${fmt(amount)} tPOT` : '—'} /><Row label="Active stake remaining" value={remaining === null ? '—' : `${fmt(remaining)} tPOT`} /><Row label="Unlocking after tx" value={valid ? `${fmt(Number(unlocking) + Number(amount))} tPOT` : '—'} /><Row label="Network fee" value="Calculated before signing" muted /><Row label="Unbonding period" value={bondingEras ? `${bondingEras} eras` : '—'} muted /></div>
           {!account && <div className="unstake-warning">Connect the wallet used on Stake first.</div>}
           {account && chainData.status === 'loading' && <div className="unstake-note">Reading the live staking ledger…</div>}
           {account && chainData.status === 'error' && <div className="unstake-warning">{chainData.error || 'Unable to read the staking ledger.'}</div>}

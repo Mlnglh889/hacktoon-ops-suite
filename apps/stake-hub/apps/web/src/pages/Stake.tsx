@@ -19,7 +19,7 @@ const cachedValidators = (): Validator[] => {
     return Array.isArray(parsed) ? parsed as Validator[] : []
   } catch { return [] }
 }
-const fmt = (value: string | number | null, digits = 4) => value === null ? 'Unavailable' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })
+const fmt = (value: string | number | null, digits = 4) => value === null ? '—' : Number(value).toLocaleString('en-US', { maximumFractionDigits: digits })
 const short = (address: string) => `${address.slice(0, 8)}…${address.slice(-6)}`
 
 function Metric({ icon, label, value, note, tone = 'normal' }: { icon: string; label: string; value: string; note: string; tone?: 'normal' | 'green' | 'violet' | 'blue' }) {
@@ -109,7 +109,7 @@ export default function Stake() {
   const setPercentage = (percentage: number) => {
     if (freePlanck === null) return
     // Keep a reserve for network fee + existential deposit so Max never produces an unsignable tx.
-    const RESERVE_PLANCK = 2n * 10n ** 13n // 0.2 POT: covers ED (0.1) + fee (~0.012) + margin; submitAndWatch requires amount+fee+ED <= free
+    const RESERVE_PLANCK = 2n * 10n ** 13n // 0.2 tPOT: covers ED (0.1) + fee (~0.012) + margin; submitAndWatch requires amount+fee+ED <= free
     const free = BigInt(freePlanck)
     const usable = free > RESERVE_PLANCK ? free - RESERVE_PLANCK : 0n
     const planck = usable * BigInt(Math.round(percentage * 100)) / 100n
@@ -169,10 +169,10 @@ export default function Stake() {
       <div className="unstake-grid">
         <div className="unstake-main-column">
           <section className="unstake-metrics">
-            <Metric icon="account_balance_wallet" label="Available Balance" value={balance === null ? 'Unavailable' : `${fmt(balance)} tPOT`} note="Wallet balance" />
-            <Metric icon="lock" label="Bonded Balance" value={chainData.bondedPlanck === null ? 'Unavailable' : `${fmt(planckToPot(chainData.bondedPlanck))} tPOT`} note={`Active in ${chainData.nominations.length} validators`} />
-            <Metric icon="trending_up" label="Est. APY" value={overview ? `${overview.est_base_apy_pct.toFixed(1)}%` : 'Unavailable'} note={overview?.apy_is_model_estimate ? 'Model estimate' : 'Network estimate'} tone="violet" />
-            <Metric icon="hub" label="Network Status" value={stats?.era ? `Era ${stats.era}` : 'Unavailable'} note={`${stats?.active_validator_count ?? '—'} / ${stats?.validators ?? validators.length} active validators`} tone="green" />
+            <Metric icon="account_balance_wallet" label="Available Balance" value={balance === null ? '—' : `${fmt(balance)} tPOT`} note={balance === null ? 'Connect wallet to read' : 'Wallet balance'} />
+            <Metric icon="lock" label="Bonded Balance" value={chainData.bondedPlanck === null ? '—' : `${fmt(planckToPot(chainData.bondedPlanck))} tPOT`} note={chainData.bondedPlanck === null ? 'No staking ledger' : `Active in ${chainData.nominations.length} validators`} />
+            <Metric icon="trending_up" label="Est. APY" value={overview ? `${overview.est_base_apy_pct.toFixed(1)}%` : '—'} note={overview?.apy_is_model_estimate ? 'Model estimate' : 'Network estimate'} tone="violet" />
+            <Metric icon="hub" label="Network Status" value={stats?.era ? `Era ${stats.era}` : '—'} note={`${stats?.active_validator_count ?? '—'} / ${stats?.validators ?? validators.length} active validators`} tone="green" />
           </section>
 
           <section className="unstake-card">
@@ -194,8 +194,8 @@ export default function Stake() {
                     const isSelected = selected.includes(validator.address)
                     return <tr key={validator.address} onClick={() => toggleValidator(validator.address)} style={{ cursor: 'pointer', background: isSelected ? '#171a45' : undefined }}>
                       <td><div className="unstake-validator"><span className={`unstake-validator-icon icon-${index % 2}`}><span className="material-symbols-outlined" translate="no">{index % 2 ? 'dns' : 'security'}</span></span><div className="validator-addr-row"><small translate="no">{short(validator.address)}</small><button type="button" className="copy-address-btn" aria-label="Copy validator address" title="Copy address" onClick={e => { e.stopPropagation(); void navigator.clipboard?.writeText(validator.address).then(() => { setCopied(validator.address); window.setTimeout(() => setCopied(c => c === validator.address ? null : c), 1400) }).catch(() => {}) }}><span className="material-symbols-outlined" translate="no">{copied === validator.address ? 'check' : 'content_copy'}</span></button></div></div></td>
-                      <td className="mono" translate="no">{validator.commission === null ? 'Unavailable' : `${validator.commission.toFixed(1)}%`}</td>
-                      <td className="mono" translate="no">{validator.total_stake_pot === null ? 'Unavailable' : `${fmt(validator.total_stake_pot, 2)} tPOT`}</td>
+                      <td className="mono" translate="no">{validator.commission === null ? '—' : `${validator.commission.toFixed(1)}%`}</td>
+                      <td className="mono" translate="no">{validator.total_stake_pot === null ? '—' : `${fmt(validator.total_stake_pot, 2)} tPOT`}</td>
                       <td><span className="unstake-active"><i />{validator.status || 'Active'}</span></td>
                       <td><input type="checkbox" name="validator" checked={isSelected} onChange={() => toggleValidator(validator.address)} onClick={e => e.stopPropagation()} aria-label={`Select ${validator.name}`} /></td>
                     </tr>
@@ -214,10 +214,10 @@ export default function Stake() {
               </div>
             </div>
             <div className="unstake-review-box" style={{ margin: 20 }}>
-              <Row label="Average commission" value={avgCommission === null ? 'Unavailable' : `${avgCommission.toFixed(1)}%`} />
-              <Row label="Total staked (network)" value={overview ? `${fmt(overview.total_staked_pot, 2)} tPOT` : 'Unavailable'} />
-              <Row label="Staking ratio" value={stats ? `${stats.staking_ratio_pct.toFixed(1)}%` : 'Unavailable'} />
-              <Row label="Reward estimate" value="Unavailable" muted />
+              <Row label="Average commission" value={avgCommission === null ? '—' : `${avgCommission.toFixed(1)}%`} />
+              <Row label="Total staked (network)" value={overview ? `${fmt(overview.total_staked_pot, 2)} tPOT` : '—'} />
+              <Row label="Staking ratio" value={stats ? `${stats.staking_ratio_pct.toFixed(1)}%` : '—'} />
+              <Row label="Reward estimate" value="Not modelled on V3" muted />
             </div>
             <div className="unstake-advisory"><span className="material-symbols-outlined tone-blue" translate="no">info</span><p><strong>Estimates only:</strong> reward and APY figures are model estimates, not verified payouts. Unbonding period is set by the runtime.</p></div>
           </section>
@@ -225,7 +225,7 @@ export default function Stake() {
 
         <aside className="unstake-card unstake-form-card">
           <div className="unstake-form-head"><div><h2>Stake amount</h2><p>Review your delegation before signing.</p></div><span className="material-symbols-outlined tone-violet" translate="no">account_balance_wallet</span></div>
-          <div className="unstake-available"><span>Available balance</span><b>{balance === null ? 'Unavailable' : `${fmt(balance)} tPOT`}</b></div>
+          <div className="unstake-available"><span>Available balance</span><b>{balance === null ? 'Connect wallet' : `${fmt(balance)} tPOT`}</b></div>
           <div className="unstake-field-label"><label htmlFor="stake-input">Amount to stake</label><button type="button" onClick={() => setPercentage(1)} disabled={freePlanck === null}>Use maximum</button></div>
           <div className="unstake-input-wrap"><input id="stake-input" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.0000" aria-invalid={amountInvalid} /><strong>tPOT</strong></div>
           <div className="unstake-quick">{[.25, .5, .75, 1].map((p, i) => <button key={p} type="button" disabled={freePlanck === null} onClick={() => setPercentage(p)}>{i === 3 ? 'Max' : `${p * 100}%`}</button>)}</div>
@@ -237,7 +237,7 @@ export default function Stake() {
             <Row label="Equal share per validator (estimate)" value={validAmount && selectedValidators.length > 1 ? `${fmt(Number(amount) / selectedValidators.length, 6)} tPOT each` : validAmount ? `${fmt(amount)} tPOT (single validator)` : '—'} muted />
             <Row label="Balance after tx" value={remaining === null ? '—' : `${fmt(remaining)} tPOT`} />
             <Row label="Network fee" value={feeEstimate ? `~${fmt(feeEstimate, 6)} tPOT` : account && validAmount ? 'Estimating…' : 'Enter amount to estimate'} muted />
-            <Row label="Unbonding period" value={bondingEras ? `${bondingEras} eras (~${Math.round(bondingEras * 6 * 600 * 6 / 86400)} days)` : 'Unavailable'} muted />
+            <Row label="Unbonding period" value={bondingEras ? `${bondingEras} eras (~${Math.round(bondingEras * 6 * 600 * 6 / 86400)} days)` : '—'} muted />
             <p className="unstake-note" style={{ fontSize: 11 }}>Stake tidak dipecah otomatis. Nominasi ke beberapa validator memberi exposure per era, ditentukan runtime (bisa tidak merata). Angka di atas hanya estimasi rata-rata.</p>
           </div>
           {!account && <div className="unstake-warning">Connect your wallet to view your balance and stake.</div>}

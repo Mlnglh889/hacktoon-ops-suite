@@ -127,6 +127,21 @@ def endpoints():
     return items or list(DEFAULT_ENDPOINTS)
 
 
+def endpoint_candidates(primary):
+    """Return ordered failover candidates for one chain family.
+
+    Backward compatible: V3_RPC_ENDPOINTS still defines the configured rows.
+    Optional family-specific lists enable failover without inventing endpoints.
+    """
+    family = family_of(primary)
+    key = "V3_RPC_EVM_ENDPOINTS" if family == "evm" else "V3_RPC_SUBSTRATE_ENDPOINTS"
+    raw = os.getenv(key, "")
+    configured = [x.strip() for x in raw.split(",") if x.strip()]
+    if not configured:
+        configured = [primary]
+    return list(dict.fromkeys(configured))
+
+
 class Breaker:
     def __init__(self):
         self.failures = 0
@@ -191,38 +206,51 @@ def probe_evm(url):
     return number, "eth_chainId + eth_blockNumber"
 
 
+def _probe_one(ws):
+    family = family_of(ws)
+    if family == "evm":
+        number, method = probe_evm(ws)
+        url = ws
+    else:
+        url = _http_url(ws)
+        header = _rpc(url, "chain_getHeader", [])
+        number = int(header["number"], 16) if header and header.get("number") else None
+        method = "chain_getHeader"
+    return number, method, url
+
+
 def probe(ws):
-    """Measure one endpoint. Returns a dict with measured fields only."""
+    """Measure one configured endpoint, trying ordered same-family fallbacks."""
     b = _breaker(ws)
     state = b.state()
     checked_at = int(time.time())
+    candidates = endpoint_candidates(ws)
     if state == "open":
         return {"endpoint": ws, "chain_family": family_of(ws), "state": "open", "ok": False, "latency_ms": None,
                 "block_number": None, "error": b.last_error, "checked_at": checked_at,
+                "attempted_endpoints": candidates, "failover_used": False,
                 "source": "rpc_health circuit breaker"}
     started = time.time()
-    family = family_of(ws)
-    try:
-        if family == "evm":
-            number, method = probe_evm(ws)
-            url = ws
-        else:
-            url = _http_url(ws)
-            header = _rpc(url, "chain_getHeader", [])
-            number = int(header["number"], 16) if header and header.get("number") else None
-            method = "chain_getHeader"
-        latency = round((time.time() - started) * 1000)
-        b.record_ok()
-        return {"endpoint": ws, "chain_family": family, "state": "closed", "ok": True, "latency_ms": latency,
-                "block_number": number, "error": None, "checked_at": checked_at,
-                "source": f"live JSON-RPC {method} via {url}"}
-    except Exception as exc:
-        b.record_fail(exc)
-        return {"endpoint": ws, "chain_family": family_of(ws), "state": b.state(), "ok": False,
-                "latency_ms": round((time.time() - started) * 1000),
-                "block_number": None, "error": str(exc)[:200], "checked_at": checked_at,
-                "failure_kind": failure_kind(exc), "source": "live JSON-RPC probe failed"}
-
+    errors = []
+    for candidate in candidates:
+        try:
+            number, method, url = _probe_one(candidate)
+            latency = round((time.time() - started) * 1000)
+            b.record_ok()
+            return {"endpoint": ws, "chain_family": family_of(ws), "state": "closed", "ok": True, "latency_ms": latency,
+                    "block_number": number, "error": None, "checked_at": checked_at,
+                    "attempted_endpoints": candidates, "failover_used": candidate != ws,
+                    "active_endpoint": candidate,
+                    "source": f"live JSON-RPC {method} via {url}"}
+        except Exception as exc:
+            errors.append(f"{candidate}: {str(exc)[:160]}")
+    error = "; ".join(errors)[:500]
+    b.record_fail(error)
+    return {"endpoint": ws, "chain_family": family_of(ws), "state": b.state(), "ok": False,
+            "latency_ms": round((time.time() - started) * 1000), "block_number": None,
+            "error": error, "checked_at": checked_at, "attempted_endpoints": candidates,
+            "failover_used": False, "failure_kind": failure_kind(ConnectionError(error)),
+            "source": "all configured RPC candidates failed"}
 
 def report(window="latest"):
     windows = {"1h": 3600, "24h": 86400, "7d": 604800}
