@@ -83,24 +83,38 @@ export default function Portfolio() {
   const rows = payouts?.rows ?? []
   const totals = payouts?.totals
   const eraLabel = network?.latest_era == null ? 'Era —' : `Era #${network.latest_era}`
-  const emptyHint = payoutAddress ? `No staking exposure for ${short(payoutAddress)} in the last ${payouts?.eras.length ?? 8} eras.` : 'Connect a wallet to read payouts.'
+  const emptyHint = payoutAddress ? `No verified payout records for ${short(payoutAddress)} in the last ${payouts?.eras.length ?? 8} eras.` : 'Connect a wallet to read your staking position and payouts.'
+  const walletState = account ? `Connected · ${short(account.address)}` : readOnlyAddress ? `Read-only · ${short(readOnlyAddress)}` : 'Wallet not connected'
+  const dataState = chainData.status === 'ready' ? 'Live chain read' : chainData.status === 'loading' ? 'Reading chain data…' : 'Chain data unavailable'
 
   return (
     <main className="portfolio-page relative z-10 flex-1 w-full max-w-[1520px] mx-auto px-4 sm:px-6 pt-24 lg:pt-[76px] pb-10 space-y-5">
+      <header className="pf-page-head">
+        <div>
+          <p className="pf-kicker">Portfolio</p>
+          <h1>Your staking position</h1>
+          <p className="pf-intro">See your wallet balance, active stake, unbonding funds, nominated validators, and verified rewards in one place.</p>
+        </div>
+        <div className="pf-context"><span>{walletState}</span><span className={chainData.status === 'ready' ? 'is-ok' : ''}><i />{dataState}</span></div>
+      </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
-        <Metric label="Available" value={chainData.freePot === null ? '—' : `${fmt(chainData.freePot)} tPOT`} note={chainData.freePot === null ? 'Connect wallet' : 'Ready to stake'} tone="cyan" />
-        <Metric label="Staked" value={chainData.bondedPot === null ? '—' : `${fmt(chainData.bondedPot)} tPOT`} note={chainData.hasLedger ? 'On-chain ledger' : 'No active stake'} tone="purple" />
-        <Metric label="Unlocking" value={`${fmt(chainData.unlockingPot)} tPOT`} note={`${chainData.unlockingCount} chunk(s) pending`} tone="muted" />
-        <Metric label="Nominations" value={`${chainData.nominations.length}`} note="Validator targets" tone="green" />
+        <Metric label="Available to stake" value={chainData.freePot === null ? '—' : `${fmt(chainData.freePot)} tPOT`} note={chainData.freePot === null ? 'Connect wallet to read' : 'Free wallet balance'} tone="cyan" />
+        <Metric label="Active stake" value={chainData.bondedPot === null ? '—' : `${fmt(chainData.bondedPot)} tPOT`} note={chainData.hasLedger ? 'Currently bonded on chain' : 'No active staking ledger'} tone="purple" />
+        <Metric label="Unbonding" value={`${fmt(chainData.unlockingPot)} tPOT`} note={`${chainData.unlockingCount} release chunk(s)`} tone="muted" />
+        <Metric label="Nominated validators" value={`${chainData.nominations.length}`} note="Current wallet targets" tone="green" />
       </section>
 
       <section className="pf-card">
         <div className="pf-card-head">
-          <div className="pf-tabs">
+          <div>
+            <h2 className="pf-title">Wallet details</h2>
+            <p className="pf-subtitle">Current balances and validator targets read from your wallet.</p>
+          </div>
+          <div className="pf-tabs" aria-label="Wallet details views">
             <button onClick={() => setTab('position')} className={`pf-tab ${tab === 'position' ? 'is-active' : ''}`}>Position</button>
             <button onClick={() => setTab('nominations')} className={`pf-tab ${tab === 'nominations' ? 'is-active' : ''}`}>
-              Validators
+              Nominated validators
               <span className="pf-tab-count">{chainData.nominations.length}</span>
             </button>
           </div>
@@ -120,7 +134,7 @@ export default function Portfolio() {
               <Field label="Staked" value={chainData.bondedPot === null ? '—' : `${fmt(chainData.bondedPot)} tPOT`} />
               <Field label="Unlocking" value={`${fmt(chainData.unlockingPot)} tPOT`} />
             </div>
-            <div className="pf-source">Connected wallet · live Substrate RPC</div>
+            <div className="pf-source">Source: connected wallet · live Portaldot V3 Substrate RPC</div>
           </div>
         ) : (
           <div className="pf-table-wrap">
@@ -153,8 +167,11 @@ export default function Portfolio() {
       <section className="pf-card">
         <div className="pf-card-head">
           <div className="flex items-center gap-2.5">
-            <h2 className="pf-title">Payout history</h2>
-            <span className="pf-chip">{payouts?.eras.length ?? 8} eras</span>
+            <div>
+              <h2 className="pf-title">Verified rewards</h2>
+              <p className="pf-subtitle">Rewards read from staking payout records for this wallet.</p>
+            </div>
+            <span className="pf-chip">Last {payouts?.eras.length ?? 8} eras</span>
           </div>
           <div className="flex items-center gap-1.5">
             {payouts && <span className="pf-chip">{payouts.served_from === 'cache' ? 'Cached' : 'Chain'}</span>}
