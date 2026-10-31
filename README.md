@@ -1,125 +1,239 @@
-# Portaldot Ops Suite
+# Portaldot OPS Suite
 
-**Staking on Portaldot V3 is blind.** You lock tPOT with a validator without seeing how concentrated the stake is, or whether the commission quietly changed. Ops Suite reads the chain directly and shows validator health, stake concentration, and commission risk on one screen. Each number is tied to a specific block, and the snapshot is saved so anyone can re-check it.
+A non-custodial operator console and staking workspace for the Portaldot V3 testnet.
 
-> Portaldot Hacker House 2026 · Check-in build
+Portaldot OPS Suite combines live chain observability with user-signed staking flows. It makes validator commission, exposure, nomination limits, RPC performance, network state, and staking transactions easier to inspect without taking custody of wallet keys.
 
-**Demo video:** https://x.com/Lannna4332/status/2113643661250719786
-**Live website:** https://pretty-chocolate-gerald-situations.trycloudflare.com
+> Testnet only. tPOT has no monetary value. Never enter a seed phrase or private key into this project.
 
-## Network
+## Live website
 
-| Item | Value |
+**Production app:** https://vercel-redesign.vercel.app/
+
+The public surface contains:
+
+- **Home** — product overview and network proof.
+- **Product** — how the operator console and user-signed staking flow work.
+- **Docs** — live network reference, staking lifecycle, API reference, troubleshooting, and module guide.
+- **Open Stake Hub** — the internal OPS Suite workspace.
+
+The internal workspace currently contains:
+
+- Overview
+- Stake
+- Unstake
+- Portfolio
+- Validators
+- RPC Analyst
+- Docs
+- Ask AI
+
+## What the product does
+
+### Observe the network
+
+The OPS Suite reads Portaldot V3 data through the API and displays:
+
+- Current block and era
+- Validator count and total stake
+- Validator commission and exposure
+- Nominator counts and nomination limits
+- Substrate and EVM RPC probe results
+- Cached/stale state when a live read is temporarily unavailable
+
+Every live value should be traceable to a chain read, RPC measurement, configured endpoint, or an explicitly labelled cached response. The UI does not invent uptime, APY, TVL, audit claims, or risk metrics.
+
+### Stake from the user's wallet
+
+The browser builds staking extrinsics locally. The connected wallet extension signs them. The backend does not hold a seed phrase, private key, or signing account.
+
+Supported flows include:
+
+- Bond / stake tPOT
+- Unbond / unstake tPOT
+- Nominate up to two validators
+- Review fee information before signing
+- Display a transaction toast with the extrinsic hash and explorer link
+- Track portfolio balances and unbonding chunks
+
+## Network reference
+
+| Parameter | Value |
 |---|---|
-| Substrate WS | `wss://test-node-v3.portaldot.dev` |
-| EVM RPC | `https://test-evm-rpc-v3.portaldot.dev` |
+| Network | Portaldot V3 Testnet |
 | EVM chain ID | `420420777` |
-| Explorer | `https://node-console.portaldot.dev` |
-| Token | tPOT (14 decimals) |
+| Native token | `tPOT` · 14 decimals |
+| SS58 prefix | `42` |
+| Substrate RPC (WSS) | `wss://test-node-v3.portaldot.dev` |
+| Substrate RPC (HTTPS) | `https://test-node-v3.portaldot.dev` |
+| EVM RPC (HTTPS) | `https://test-evm-rpc-v3.portaldot.dev` |
+| Testnet explorer | `https://scanner-testnet-v3.portaldot.dev` |
+| Node console | `https://node-console.portaldot.dev` |
 
-Testnet only. No mainnet data is mixed into this dashboard.
+No mainnet data is mixed into this dashboard.
 
-## What works now
+## API reference
 
-| Feature | Status |
-|---|---|
-| Collector: block, session validators, era, staking (`ErasStakers`, `ErasValidatorPrefs`, `ErasRewardPoints`) | Working, one-shot run (`--once`) |
-| SQLite snapshot store | Working |
-| Read-only API (`/api/v1/...`) | Working, see list below |
-| Validator health dashboard (`/`) | Working, served by FastAPI |
-| Backend unit tests | 87 passed (`.venv/bin/python -m pytest` from the repo root) |
-| Stake Hub web app (`apps/stake-hub/apps/web`) | Working: stake, unstake, nominate, validator health, RPC Analyst, alerts |
-| Stake Hub API (`apps/stake-hub/backend/app`) | Working, served by FastAPI |
-| OpsRegistry heartbeat contract | **Deployed and heartbeat confirmed** on Portaldot V3 EVM (chain 420420777): `0x132748201FbCB051CA6D73d26f27540a214d1336`, deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, heartbeat tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` |
+The production frontend uses these read-only API routes:
 
-## Stake Hub
+```text
+GET /api/v3/overview
+GET /api/v3/validators
+GET /api/v3/infra/rpc?window=1h|24h|7d
+GET /api/v3/network
+GET /api/v3/health
+GET /api/v3/incidents
+```
 
-The user-signed staking app lives in this repo under `apps/stake-hub`:
+The API responses are served through the deployment's relative `/api` path. The frontend keeps static configuration visible when a live request fails and labels stale data instead of replacing it with fake zeros.
 
-- `apps/stake-hub/apps/web` — React app (Vite + Tailwind). Stake, unstake, nominate, validator health, RPC Analyst, alerts. Every action shows a TxToast with the extrinsic hash and explorer link.
-- `apps/stake-hub/backend/app` — FastAPI service. Short-cached reads of `/network` and `/validators`, plus RPC health, incident timeline and payout history.
+## Repository layout
 
-The browser builds each extrinsic and the user's own wallet extension signs it. The backend never holds a key.
+```text
+backend/                 Collector, read-only API, metrics and chain helpers
+contracts/               OpsRegistry contract source
+scripts/                 Deployment and heartbeat preparation utilities
+data/                    Testnet evidence and local snapshot data
+docs/                    Architecture and development notes
+tests/                   Backend and collector tests
+dashboard.html           Legacy standalone dashboard surface
+```
 
-Staking actions on the same testnet were verified on-chain:
-
-- Stake 1 tPOT, unstake 1 tPOT, nominate 2 validators.
-- Tx hashes and blocks: [`data/testnet-evidence.md`](data/testnet-evidence.md).
+The current production visual application is maintained separately in the local `portaldot-redesign` workspace and deployed to the Vercel project behind the live URL above. The public GitHub repository remains the source for the backend, evidence, contract, and project documentation.
 
 ## Architecture
 
-![Architecture](docs/architecture.svg)
-
-Two parts share one Portaldot V3 testnet and never mix data:
-
-- **Ops Suite:** a collector reads validator, era, exposure, commission and reward-point data from chain, stores snapshots in SQLite, and serves a dashboard and API. It never signs anything.
-- **Stake Hub (user-signed):** the web app lets a user **stake**, **unstake** and **nominate** (set validators, max 2). The browser builds each extrinsic and the user's own wallet extension signs it. The backend only serves a short-cached read.
-
-Heartbeat proof is a separate EVM path: `OpsRegistry` on Portaldot V3 EVM stores heartbeat payload hashes.
-
 ```text
-Portaldot V3 Substrate WS ──> collector ──> SQLite ──> API / dashboard
-Stake Hub UI ──> wallet extension (user signs) ──> Portaldot V3 Substrate WS
-Portaldot V3 EVM RPC ──> OpsRegistry heartbeat ──> RPC receipt proof
+Portaldot V3 Substrate RPC
+        │
+        ├── collector / chain reads ──> local snapshot data ──> read-only API
+        │                                                        │
+        │                                                        ▼
+        │                                             OPS Suite frontend
+        │                                      Overview / Validators / RPC Analyst
+        │
+        └── connected wallet extension <── browser-built extrinsic
+                                                │
+                                                └── user signs locally
+
+Portaldot V3 EVM RPC ──> OpsRegistry heartbeat evidence
 ```
 
-Layers:
+Important boundaries:
 
-- **Collector** (`backend/collector.py`, `collector_logic.py`): reads `Session.Validators`, `Staking.CurrentEra`, `Staking.ErasStakersOverview`, `Staking.ErasValidatorPrefs`, `Staking.ErasRewardPoints`. The legacy `ErasStakers` map is empty on this runtime, so it is no longer read.
-- **Storage** (`backend/schema.sql`): SQLite, local-first.
-- **API** (`backend/api.py`): FastAPI, read-only.
-- **Dashboard** (`dashboard.html`): vanilla HTML/CSS/JS, served by the API at `/`.
-- **Stake Hub** (`apps/stake-hub/apps/web`, `apps/stake-hub/backend/app`): React app for stake, unstake and nominate, plus validator health, RPC Analyst and alerts. Each action shows a TxToast with the extrinsic hash and explorer link. Backend caches `/network` and `/validators` for 60 s.
-- **Heartbeat** (`contracts/OpsRegistry.sol`, `scripts/prepare_heartbeat.py`): contract deployed to Portaldot V3 EVM at `0x132748201FbCB051CA6D73d26f27540a214d1336` (deploy tx `0xd1a94694ac01b494be79e977361d956af93a52e420fc9169c4c6219aadfb9a20`, block 159167, status 1). Heartbeat confirmed: tx `0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77` (block 159265, status 1, `heartbeatCount` = 1). Evidence: `data/deployment-evidence.json`.
+- Observability reads do not sign transactions.
+- Staking transactions are signed by the user's wallet extension.
+- The backend is not a custodial wallet service.
+- Cached values are labelled and are not presented as fresh chain state.
+- Testnet configuration and evidence must not be interpreted as mainnet readiness.
 
 ## Run locally
+
+### Backend
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r backend/requirements.txt
 cp .env.example .env
-python -m backend.collector --once      # one snapshot from V3 testnet
-uvicorn backend.api:app --reload        # dashboard at http://127.0.0.1:8000
+python -m backend.collector --once
+uvicorn backend.api:app --reload
 ```
 
-Run tests:
+The legacy backend dashboard/API is available at `http://127.0.0.1:8000` when started with the appropriate app entrypoint.
+
+### Stake Hub backend and frontend
+
+```bash
+cd apps/stake-hub/backend
+python -m uvicorn app.main:app --reload
+```
+
+In another terminal:
+
+```bash
+cd apps/stake-hub/apps/web
+npm install
+npm run dev
+```
+
+The exact local API origin may be configured by the frontend environment. Use the repository's Vite configuration and `.env` examples rather than hard-coding production credentials.
+
+## Tests
+
+Run the repository test suite from the root:
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-This covers both suites (`tests/` and `apps/stake-hub/backend/tests/`) via `pytest.ini`.
-
-Run the Stake Hub web app and API:
+Run the frontend build where applicable:
 
 ```bash
 cd apps/stake-hub/apps/web
 npm install
-npm run dev                    # Vite dev server
-
-cd ../../backend
-python -m uvicorn app.main:app --reload
+npm run build
 ```
 
-## API
+Do not claim a deployment, transaction, or live-chain result without checking the actual command output or on-chain evidence.
 
-- `GET /api/v1/health`
-- `GET /api/v1/overview`
-- `GET /api/v1/validators`
-- `GET /api/v1/validators/{address}`
-- `GET /api/v1/eras/latest`
-- `GET /api/v1/blocks`
-- `GET /api/v1/balance/{ss58_address}` (read-only native POT balance)
-- `GET /api/v1/deployment-evidence`
+## Evidence and honest limits
 
-## Honest limits
+- The project is a Portaldot V3 testnet build, not a mainnet product.
+- Validator and exposure values reflect what the configured runtime and API return at read time.
+- Risk labels are derived indicators, not an audited protocol risk model.
+- RPC health is a measurement of the configured probes and can change with network conditions.
+- Cached data can be stale; the UI must show its last update state.
+- Wallet signing remains an explicit user action.
+- Historical transaction evidence belongs in `data/testnet-evidence.md` and should be rechecked against the explorer before being cited as current.
 
-- Exposure comes from `ErasStakersOverview`. Eras before the snapshot window may show only the genesis self-stake (about 9,999.99 tPOT, 0 nominators), which is what the chain returns.
-- Risk score is rule-based. It has no long history yet.
-- OpsRegistry is deployed (`0x132748201FbCB051CA6D73d26f27540a214d1336`) and one heartbeat is confirmed (`0x1166cfc1ba80a9663465c8106224d3b3672fadf241b525620c13698d73eafe77`, block 159265). Only one heartbeat has been sent so far; the payload snapshot is from block 159240 and is not refreshed continuously.
-- The payload in `data/heartbeat-payload.json` is from an older snapshot (block 71886, era 20). It must be regenerated before deployment.
+## Security
+
+Never commit:
+
+- Seed phrases
+- Private keys
+- Wallet passwords
+- API tokens
+- Production credentials
+- Unredacted environment files
+
+Report a project issue at:
+
+https://github.com/Mlnglh889/hacktoon-ops-suite/issues
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Third-party dependencies are listed in `backend/requirements.txt`.
+MIT — see [LICENSE](LICENSE).
+
+Third-party dependencies are listed in `backend/requirements.txt` and the relevant frontend `package.json` files.
+
+## Project links
+
+- Live app: https://vercel-redesign.vercel.app/
+- Source repository: https://github.com/Mlnglh889/hacktoon-ops-suite
+- Demo video: https://x.com/Lannna4332/status/2113643661250719786
+- Testnet explorer: https://scanner-testnet-v3.portaldot.dev
+- Node console: https://node-console.portaldot.dev
+- Substrate RPC: https://test-node-v3.portaldot.dev
+- EVM RPC: https://test-evm-rpc-v3.portaldot.dev
+
+This README describes the current website and the repository boundaries as of the latest verified deployment. Live chain numbers and stale/live state should be read from the website or API at runtime, not copied into static documentation.
+
+## Contributing
+
+Keep changes narrow and verifiable:
+
+1. Read the relevant code and existing evidence first.
+2. Preserve the non-custodial wallet boundary.
+3. Use `tPOT` consistently; do not introduce `POT`, `tPot`, or `dot` as the token unit.
+4. Add or update tests for behavior changes.
+5. Run the relevant build/test command.
+6. Report live deployment and chain state honestly.
+7. Do not push changes until the final diff has been reviewed.
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for repository-specific development notes.
+
+---
+
+Built for the Portaldot Hacker House 2026 testnet build.
