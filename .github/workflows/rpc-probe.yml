@@ -1,0 +1,19 @@
+name: RPC history probe
+
+on:
+  schedule:
+    # GitHub Actions is the independent scheduler for the Hobby Vercel project.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Record live RPC measurements
+        run: |
+          set -euo pipefail
+          url='https://portaldotopssuite.vercel.app/api/v3/infra/rpc?window=1h'
+          body=$(curl --fail --silent --show-error --max-time 120 "$url")
+          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("endpoints"), "no endpoints"; print("probed", [(e.get("chain_family"), len(e.get("history", {}).get("samples", []))) for e in d["endpoints"]])' <<< "$body"
