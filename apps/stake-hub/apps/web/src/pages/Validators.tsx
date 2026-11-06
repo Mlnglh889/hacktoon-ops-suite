@@ -43,6 +43,27 @@ function riskLabel(tier: string) {
 
 const VALIDATORS_CACHE_KEY = 'portaldot.v3.validators.cache'
 const CHANGES_PER_PAGE = 6
+const ACTIVITY_GROUPS_PER_PAGE = 6
+type ActivityRange = '1h' | '24h' | '7d' | 'all'
+type ActivityField = 'all' | 'total_pot' | 'own_pot' | 'nominator_count'
+
+function numericDelta(change: SnapshotChange): number | null {
+  const oldValue = Number(change.old_value)
+  const newValue = Number(change.new_value)
+  return Number.isFinite(oldValue) && Number.isFinite(newValue) ? newValue - oldValue : null
+}
+
+function activityFieldLabel(field: string) {
+  return ({ total_pot: 'Total Stake', own_pot: 'Own Stake', nominator_count: 'Nominators', commission_pct: 'Commission', membership: 'Membership' } as Record<string, string>)[field] ?? field
+}
+
+function formatActivityDelta(field: string, delta: number | null) {
+  if (delta === null) return '—'
+  const sign = delta > 0 ? '+' : ''
+  if (field === 'total_pot' || field === 'own_pot') return `${sign}${delta.toLocaleString('en-US', { maximumFractionDigits: 2 })} tPOT`
+  if (field === 'nominator_count') return `${sign}${delta.toLocaleString('en-US', { maximumFractionDigits: 0 })} wallets`
+  return `${sign}${delta.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+}
 
 // Display-only formatting for snapshot change values. Raw values stay unchanged in the API.
 function formatChangeValue(field: string, value: string | null): string {
@@ -161,6 +182,10 @@ export default function Validators() {
   const [changes, setChanges] = useState<SnapshotChange[] | null>(null)
   const [snapshotError, setSnapshotError] = useState(false)
   const [changesPage, setChangesPage] = useState(0)
+  const [activityRange, setActivityRange] = useState<ActivityRange>('24h')
+  const [activityField, setActivityField] = useState<ActivityField>('all')
+  const [activityValidator, setActivityValidator] = useState('all')
+  const [expandedActivity, setExpandedActivity] = useState<Record<string, boolean>>({})
   useEffect(() => {
     let alive = true
     const loadSnapshot = () => Promise.all([v3SnapshotApi.latest(), v3SnapshotApi.changes(200)])
@@ -330,73 +355,36 @@ export default function Validators() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-[#24305c] bg-[#070d24] px-4 py-3 text-[11px] font-mono text-[#8a94b8]"><span>{validators.length} validators · {formatPot(totalStake)} tPOT total · {totalStake > 0 ? validators.map(row => ((row.total_stake_pot ?? 0) / totalStake) * 100).sort((a, b) => b - a).map(value => value.toFixed(0)).join('/') : '0/0'} stake concentration</span><span>Portaldot V3 testnet · Block {overview?.latest_block?.block_number ?? '—'}</span></div>
       </section>
 
-      <SectionBoundary name="Snapshot changes"><section className="validators-snapshot mt-5 bg-[#0b1231] border border-[#24305c] rounded-[10px] p-5 text-xs font-mono">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-[14px] font-semibold text-white"><span className="material-symbols-outlined text-[18px] text-[#8b5cf6]" translate="no">history</span>Snapshot changes</h2>
-          <span className="rounded border border-[#24305c] bg-[#070d24] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#8a94b8]">Stored · not live</span>
-        </div>
-        {snapshotError && <p className="mt-2 text-amber-300">Snapshot data unavailable right now. Showing last loaded state.</p>}
-        {snapshot?.snapshot ? (
-          <div className="mt-3 grid gap-2 text-[#cbd5e1] sm:grid-cols-[1fr_auto] sm:items-center">
-            <span className="text-[12px]">
-              <span className="text-[#8a94b8]">Snapshot taken </span>{Number.isFinite(snapshot.snapshot.taken_at) ? new Date(snapshot.snapshot.taken_at * 1000).toLocaleString('en-GB') : '—'}
-              <span className="text-[#8a94b8]"> · block </span>{snapshot.snapshot.block_number}
-              <span className="text-[#8a94b8]"> · era </span>{snapshot.snapshot.era ?? '—'}
-            </span>
-            <span className={`justify-self-start sm:justify-self-end inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${snapshot.stale ? 'border-amber-500/40 bg-amber-950/30 text-amber-300' : 'border-[#10b981]/40 bg-[#10b981]/10 text-[#10b981]'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${snapshot.stale ? 'bg-amber-400' : 'bg-[#10b981]'}`} />
-              {snapshot.stale ? 'Stale' : 'Fresh'} · age {snapshot.age_seconds === null ? '—' : `${Math.floor(snapshot.age_seconds / 60)} min`}
-            </span>
-            {snapshot.collector.last_error && <span className="text-amber-300 sm:col-span-2">Collector last error: {snapshot.collector.last_error}</span>}
-          </div>
-        ) : !snapshotError && snapshot ? <p className="mt-2 text-[#8a94b8]">No stored snapshot yet.</p> : null}
-        <div className="mt-3 border-t border-[#24305c]/60 pt-3">
-          {changes === null ? <p className="text-[#8a94b8]">Loading changes…</p> : (() => {
-            // Points rise every block (runtime activity), so they are kept out of the list.
-            const material = changes.filter(c => c.field !== 'points')
-            const pointsCount = changes.length - material.length
-            const fieldLabel: Record<string, string> = { commission_pct: 'commission', total_pot: 'total stake', own_pot: 'own stake', nominator_count: 'nominators', membership: 'membership' }
-            const pages = Math.max(1, Math.ceil(material.length / CHANGES_PER_PAGE))
-            const page = Math.min(changesPage, pages - 1)
-            const slice = material.slice(page * CHANGES_PER_PAGE, page * CHANGES_PER_PAGE + CHANGES_PER_PAGE)
-            return <>
-              {material.length === 0
-                ? <p className="text-[#8a94b8]">No commission, stake, nominator, or membership changes since the last snapshot.</p>
-                : <>
-                    <div className="overflow-x-auto rounded-lg border border-[#304477]">
-                      <table className="validators-snapshot-table w-full min-w-[760px] border-collapse text-left">
-                        <thead><tr className="bg-[#1b2852] text-[10px] uppercase tracking-wider text-[#9aaac8]"><th className="px-3 py-2">Type</th><th className="px-3 py-2">Validator</th><th className="px-3 py-2">Previous value</th><th className="px-3 py-2">Current value</th><th className="px-3 py-2">Change</th><th className="px-3 py-2">Time</th></tr></thead>
-                        <tbody>{slice.map(c => {
-                          const oldValue = formatChangeValue(c.field, c.old_value)
-                          const newValue = formatChangeValue(c.field, c.new_value)
-                          const numericOld = Number(c.old_value)
-                          const numericNew = Number(c.new_value)
-                          const delta = Number.isFinite(numericOld) && Number.isFinite(numericNew) ? numericNew - numericOld : null
-                          const deltaText = delta === null ? '—' : `${delta >= 0 ? '+' : ''}${delta.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-                          const positive = delta !== null && delta > 0
-                          return <tr key={c.id} className="border-t border-[#304477] bg-[#101a35] odd:bg-[#142142] hover:bg-[#202f60]">
-                            <td className="px-3 py-2"><span className={`rounded px-1.5 py-1 text-[10px] uppercase tracking-wide ${c.field === 'own_pot' ? 'bg-[#7c3aed]/30 text-[#c4b5fd]' : 'bg-[#2563eb]/25 text-[#93c5fd]'}`}>{fieldLabel[c.field] ?? c.field}</span></td>
-                            <td className="px-3 py-2 text-white">{shortAddress(c.address)}</td>
-                            <td className="px-3 py-2 text-[#9aaac8]">{oldValue}</td>
-                            <td className="px-3 py-2 font-semibold text-white">{newValue}</td>
-                            <td className={`px-3 py-2 font-semibold ${positive ? 'text-[#4ade80]' : delta !== null && delta < 0 ? 'text-[#fb7185]' : 'text-[#9aaac8]'}`}>{deltaText}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[#9aaac8]">{Number.isFinite(c.detected_at) ? new Date(c.detected_at * 1000).toLocaleString('en-GB') : '—'}</td>
-                          </tr>
-                        })}</tbody>
-                      </table>
-                    </div>
-                    {material.length > 0 && (
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#24305c]/60 pt-3 text-[#8a94b8]">
-                        <button type="button" disabled={page === 0} onClick={() => setChangesPage(page - 1)} className="rounded-md border border-[#3b4a8a] bg-[#0b1231] px-3 py-1.5 text-[#e2e8f0] hover:border-[#8a94b8] disabled:cursor-not-allowed disabled:border-[#24305c] disabled:text-[#4b5578]">← Newer</button>
-                        <span className="text-[11px]">Page <span className="text-white">{page + 1}</span> of <span className="text-white">{pages}</span> · {material.length} change{material.length === 1 ? '' : 's'}</span>
-                        <button type="button" disabled={page >= pages - 1} onClick={() => setChangesPage(page + 1)} className="rounded-md border border-[#3b4a8a] bg-[#0b1231] px-3 py-1.5 text-[#e2e8f0] hover:border-[#8a94b8] disabled:cursor-not-allowed disabled:border-[#24305c] disabled:text-[#4b5578]">Older →</button>
-                      </div>
-                    )}
-                  </>}
-              {pointsCount > 0 && <p className="mt-2 text-[10px] text-[#8a94b8]/80">{pointsCount} reward-points update(s) hidden: points rise every block and are activity, not a risk signal.</p>}
-            </>
-          })()}
-        </div>
+      <SectionBoundary name="Validator activity"><section className="validators-snapshot mt-5 rounded-[10px] border border-[#293B75] bg-[#10182E] p-5 text-xs font-mono">
+        {(() => {
+          const now = Math.floor(Date.now() / 1000)
+          const rangeSeconds = activityRange === '1h' ? 3600 : activityRange === '24h' ? 86400 : activityRange === '7d' ? 604800 : Infinity
+          const stored = (changes ?? []).filter(c => c.field !== 'points' && (activityRange === 'all' || now - c.detected_at <= rangeSeconds))
+          const filtered = stored.filter(c => (activityField === 'all' || c.field === activityField) && (activityValidator === 'all' || c.address === activityValidator))
+          const groupsMap = new Map<string, SnapshotChange[]>()
+          filtered.sort((a, b) => b.detected_at - a.detected_at).forEach(c => { const key = String(c.detected_at); groupsMap.set(key, [...(groupsMap.get(key) ?? []), c]) })
+          const groups = Array.from(groupsMap.entries()).map(([key, records]) => ({ key, timestamp: Number(key), records }))
+          const pageCount = Math.max(1, Math.ceil(groups.length / ACTIVITY_GROUPS_PER_PAGE))
+          const page = Math.min(changesPage, pageCount - 1)
+          const visibleGroups = groups.slice(page * ACTIVITY_GROUPS_PER_PAGE, page * ACTIVITY_GROUPS_PER_PAGE + ACTIVITY_GROUPS_PER_PAGE)
+          const latest = changes?.filter(c => c.field !== 'points').sort((a, b) => b.detected_at - a.detected_at) ?? []
+          const latestSnapshotId = latest[0]?.snapshot_id ?? null
+          const summaryBase = latestSnapshotId === null ? [] : latest.filter(c => c.snapshot_id === latestSnapshotId)
+          const summary = (field: ActivityField): number | null => {
+            const rows = summaryBase.filter(c => field === 'all' || c.field === field)
+            const deltas = rows.map(numericDelta).filter((value): value is number => value !== null)
+            return deltas.length ? deltas.reduce((sum, value) => sum + value, 0) : null
+          }
+          const validators = Array.from(new Set((changes ?? []).map(c => c.address)))
+          return <>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-[16px] font-semibold text-white"><span className="material-symbols-outlined text-[19px] text-[#8b5cf6]" translate="no">history</span>Validator Activity</h2><p className="mt-1 text-[11px] text-[#94A3B8]">Historical changes across the validator network.</p></div><div className="flex items-center gap-2"><span title="Historical network-level validator changes. These values do not represent your personal wallet staking activity." className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-[#293B75] text-[10px] text-[#94A3B8]">i</span><span className="rounded border border-[#293B75] bg-[#070B1A] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#94A3B8]">STORED · NOT LIVE</span></div></div>
+            {snapshotError && <p className="mt-2 text-amber-300">Snapshot data unavailable right now. Showing last loaded state.</p>}
+            {snapshot?.snapshot && <p className="mt-3 text-[11px] text-[#94A3B8]">Latest stored snapshot: <span className="text-[#F8FAFC]">{new Date(snapshot.snapshot.taken_at * 1000).toLocaleString('en-GB')}</span> · block {snapshot.snapshot.block_number} · comparison uses latest vs previous stored snapshot.</p>}
+            <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-[#293B75] bg-[#151F3A] p-3"><span className="text-[10px] uppercase text-[#94A3B8]">Total Stake Change</span><strong className={`mt-2 block text-base ${(summary('total_pot') ?? 0) > 0 ? 'text-[#4ADE80]' : (summary('total_pot') ?? 0) < 0 ? 'text-[#FB7185]' : 'text-[#94A3B8]'}`}>{formatActivityDelta('total_pot', summary('total_pot'))}</strong><span className="text-[10px] text-[#94A3B8]">latest comparison</span></div><div className="rounded-lg border border-[#293B75] bg-[#151F3A] p-3"><span className="text-[10px] uppercase text-[#94A3B8]">Own Stake Change</span><strong className={`mt-2 block text-base ${(summary('own_pot') ?? 0) > 0 ? 'text-[#4ADE80]' : (summary('own_pot') ?? 0) < 0 ? 'text-[#FB7185]' : 'text-[#94A3B8]'}`}>{formatActivityDelta('own_pot', summary('own_pot'))}</strong><span className="text-[10px] text-[#94A3B8]">latest comparison</span></div><div className="rounded-lg border border-[#293B75] bg-[#151F3A] p-3"><span className="text-[10px] uppercase text-[#94A3B8]">Nominators Change</span><strong className={`mt-2 block text-base ${(summary('nominator_count') ?? 0) > 0 ? 'text-[#4ADE80]' : (summary('nominator_count') ?? 0) < 0 ? 'text-[#FB7185]' : 'text-[#94A3B8]'}`}>{formatActivityDelta('nominator_count', summary('nominator_count'))}</strong><span className="text-[10px] text-[#94A3B8]">latest comparison</span></div></div>
+            <div className="mt-4 flex flex-wrap items-center gap-2"><span className="text-[10px] uppercase text-[#94A3B8]">Time range</span>{(['1h','24h','7d','all'] as ActivityRange[]).map(r => <button type="button" key={r} onClick={() => { setActivityRange(r); setChangesPage(0) }} className={`rounded border px-2 py-1 text-[10px] ${activityRange === r ? 'border-[#8B5CF6] bg-[#8B5CF6]/20 text-white' : 'border-[#293B75] bg-[#070B1A] text-[#94A3B8]'}`}>{r.toUpperCase()}</button>)}<select value={activityField} onChange={e => { setActivityField(e.target.value as ActivityField); setChangesPage(0) }} className="rounded border border-[#293B75] bg-[#070B1A] px-2 py-1 text-[10px] text-[#F8FAFC]"><option value="all">All Changes</option><option value="total_pot">Total Stake</option><option value="own_pot">Own Stake</option><option value="nominator_count">Nominators</option></select><select value={activityValidator} onChange={e => { setActivityValidator(e.target.value); setChangesPage(0) }} className="max-w-[220px] rounded border border-[#293B75] bg-[#070B1A] px-2 py-1 text-[10px] text-[#F8FAFC]"><option value="all">All Validators</option>{validators.map(address => <option key={address} value={address}>{shortAddress(address)}</option>)}</select></div>
+            <div className="mt-4 border-t border-[#293B75]/60 pt-3">{changes === null ? <p className="text-[#94A3B8]">Loading activity…</p> : visibleGroups.length === 0 ? <p className="text-[#94A3B8]">No stored validator activity in this range.</p> : <div className="space-y-3">{visibleGroups.map(group => { const open = expandedActivity[group.key] ?? true; return <div key={group.key} className="rounded-lg border border-[#293B75] bg-[#151F3A]"><button type="button" onClick={() => setExpandedActivity(current => ({ ...current, [group.key]: !open }))} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"><span className="text-[11px] font-semibold text-white">{new Date(group.timestamp * 1000).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span className="text-[10px] text-[#94A3B8]">{group.records.length} change{group.records.length === 1 ? '' : 's'} {open ? '⌃' : '⌄'}</span></button>{open && <div className="border-t border-[#293B75] px-3 py-2">{Array.from(new Set(group.records.map(c => c.address))).map(address => <div key={address} className="border-b border-[#293B75]/60 py-2 last:border-0"><div className="flex items-center gap-2"><span className="font-mono text-[11px] text-white">{shortAddress(address)}</span><button type="button" title="Copy validator address" onClick={() => { void copyAddress(address) }} className="text-[#94A3B8] hover:text-[#22D3EE]"><span className="material-symbols-outlined text-[13px]" translate="no">content_copy</span></button></div><div className="mt-1 grid gap-1 sm:grid-cols-3">{group.records.filter(c => c.address === address).map(c => { const delta = numericDelta(c); return <div key={c.id} className="flex items-center justify-between gap-2 text-[10px]"><span className="text-[#94A3B8]">{activityFieldLabel(c.field)}</span><span className={delta === null || delta === 0 ? 'text-[#94A3B8]' : delta > 0 ? 'text-[#4ADE80]' : 'text-[#FB7185]'}>{formatActivityDelta(c.field, delta)}</span></div> })}</div></div>)}</div>}</div> })}</div>}{groups.length > ACTIVITY_GROUPS_PER_PAGE && <div className="mt-3 flex items-center justify-between border-t border-[#293B75]/60 pt-3 text-[#94A3B8]"><button type="button" disabled={page === 0} onClick={() => setChangesPage(page - 1)} className="rounded border border-[#293B75] px-3 py-1.5 disabled:opacity-40">← Newer</button><span className="text-[10px]">Page {page + 1} of {pageCount} · {groups.length} snapshots</span><button type="button" disabled={page >= pageCount - 1} onClick={() => setChangesPage(page + 1)} className="rounded border border-[#293B75] px-3 py-1.5 disabled:opacity-40">Older →</button></div>}</div>
+          </>
+        })()}
       </section></SectionBoundary>
     </div>
 
