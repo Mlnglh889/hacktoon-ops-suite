@@ -8,7 +8,7 @@ Portaldot OPS Suite combines live chain observability with user-signed staking f
 
 ## Live website
 
-**Production app:** https://vercel-redesign.vercel.app/
+**Production app:** https://portaldotopssuite.vercel.app/
 
 The public surface contains:
 
@@ -210,7 +210,8 @@ Third-party dependencies are listed in `backend/requirements.txt` and the releva
 
 ## Project links
 
-- Live app: https://vercel-redesign.vercel.app/
+- Live app: https://portaldotopssuite.vercel.app/
+- Proposal / pitch deck: https://canva.link/37h3p0u02gn8y4x
 - Source repository: https://github.com/Mlnglh889/hacktoon-ops-suite
 - Demo video: https://x.com/Lannna4332/status/2113643661250719786
 - Testnet explorer: https://scanner-testnet-v3.portaldot.dev
