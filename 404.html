@@ -27,8 +27,8 @@
         }
         window.fetch = function (input, init) {
           var url = typeof input === 'string' ? input : input && input.url;
-          if (url && url.indexOf('/api/v3/') === 0) {
-            var key = url.split('?')[0].slice('/api/v3/'.length).replace(/\//g, '_');
+          if (url && (url.indexOf('/api/v3/') === 0 || url.indexOf('/api/v1/') === 0)) {
+            var key = url.split('?')[0].replace(/^\/api\/v[13]\//, '').replace(/\//g, '_');
             var target = base() + 'api/v3/' + key + '.json';
             return realFetch(target, init).then(function (r) {
               if (!r.ok) throw new Error('static snapshot missing: ' + target);
