@@ -1,0 +1,15 @@
+{
+ "snapshot_taken_at": 1795005336,
+ "snapshot_block": 520614,
+ "snapshot_era": 146,
+ "source": "Portaldot V3 live Substrate RPC (frozen snapshot)",
+ "note": "Static archive: live API retired 18 Nov 2026. Numbers are the last measured values.",
+ "endpoints": [
+  "eras_latest.json",
+  "health.json",
+  "network.json",
+  "overview.json",
+  "validators-history.json",
+  "validators.json"
+ ]
+}
