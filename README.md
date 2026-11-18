@@ -8,7 +8,13 @@ Portaldot OPS Suite combines live chain observability with user-signed staking f
 
 ## Live website
 
-**Production app:** https://portaldotopssuite.vercel.app/
+**Archived site (GitHub Pages):** https://mlnglh889.github.io/hacktoon-ops-suite/
+
+> Moved off Vercel on 18 Nov 2026 (VPS disk pressure + hosting takedown). The Pages
+> build ships frozen copies of every `/api/v3/*` response from the last live read, so
+> the UI renders real historical values instead of blanks. A banner in the page states
+> the snapshot block and that the live API is retired. Rebuild/deploy instructions are
+> in `docs/SITE-ARCHIVE.md`.
 
 The public surface contains:
 

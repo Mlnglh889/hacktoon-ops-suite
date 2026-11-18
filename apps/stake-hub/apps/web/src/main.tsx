@@ -5,6 +5,9 @@ import App from './App'
 import { WalletProvider } from './lib/walletContext'
 import './index.css'
 
+// basename keeps routes working when the app is served from a sub-path
+// (GitHub Pages project site: /hacktoon-ops-suite/).
+
 // Keep browser translation enabled for dynamically rendered React content.
 document.documentElement.lang = 'en'
 document.documentElement.setAttribute('translate', 'yes')
@@ -44,7 +47,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary>
       <WalletProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <App />
         </BrowserRouter>
       </WalletProvider>

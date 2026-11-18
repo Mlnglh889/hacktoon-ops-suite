@@ -1,0 +1,11 @@
+{
+ "snapshot": null,
+ "age_seconds": null,
+ "stale": true,
+ "collector": {
+  "last_ok": null,
+  "last_error": "static archive: collector retired 18 Nov 2026",
+  "running": false
+ },
+ "source": "Static archive \u2014 snapshot collector (DB) was not part of the exported data set"
+}

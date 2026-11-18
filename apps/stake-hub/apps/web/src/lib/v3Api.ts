@@ -84,14 +84,22 @@ export type V3Payouts = {
   served_from?: 'live' | 'cache'
 }
 
-const V3_API_BASE = '/api/v3'
+// Static-archive mode: the live /api/v3 backend was retired on 18 Nov 2026 and the
+// app is now served from GitHub Pages with a frozen snapshot of the last real reads.
+const V3_API_BASE = `${import.meta.env.BASE_URL}api/v3`
+
+function snapshotPath(path: string): string {
+  const clean = path.split('?')[0].replace(/^\//, '').replace(/\//g, '_')
+  return `${V3_API_BASE}/${clean}.json`
+}
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   // Hard timeout per request so one slow endpoint cannot block the others.
   const timeout = AbortSignal.timeout(20000)
   const merged = signal ? AbortSignal.any([signal, timeout]) : timeout
-  const response = await fetch(`${V3_API_BASE}${path}`, { signal: merged, cache: 'no-store' })
-  if (!response.ok) throw new Error(`V3 API ${response.status}: ${path}`)
+  const url = snapshotPath(path)
+  const response = await fetch(url, { signal: merged })
+  if (!response.ok) throw new Error(`Snapshot ${response.status}: ${path}`)
   return response.json() as Promise<T>
 }
 
