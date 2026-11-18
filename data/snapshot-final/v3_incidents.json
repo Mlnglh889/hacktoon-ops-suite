@@ -1,0 +1,1 @@
+{"incidents":[],"count":0,"source":"No incident source configured for Portaldot V3","note":"This deployment reads chain state only. Incident tracking is not part of the public Portaldot V3 RPC surface, so no records are returned rather than fabricated ones.","served_from":"empty","measured_at":1794999267}
